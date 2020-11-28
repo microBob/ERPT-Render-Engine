@@ -1,0 +1,1 @@
+blender -P ./CursorArray.py
