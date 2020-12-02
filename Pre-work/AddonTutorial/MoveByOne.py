@@ -1,9 +1,8 @@
 import bpy
 
-
 bl_info = {
 	"name": "Move X Axis",
-	"version": (1,0),
+	"version": (1, 0),
 	"blender": (2, 80, 0),
 	"category": "Object",
 }
