@@ -1,16 +1,46 @@
 import socket
+import subprocess
+import time
 
 HOST = 'localhost'
-PORT = 8083
+PORT = 8084
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind((HOST, PORT))
 s.listen(1)
 
-connection, address = s.accept()
+rounds = []
 
-data = connection.recv(1024)
-dataToString = repr(data)
-print("Received:", dataToString)
-sendData = "Received: "+dataToString
-connection.sendall(sendData.encode("ascii"))
+for i in range(4):
+    p = subprocess.Popen(["/media/microbobu/WorkDrive/Tech/ERPT-Render-Engine/Pre-work/CudaSocket/cmake-build-debug"
+                          "/CudaSocket"], shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    connection, address = s.accept()
+
+    start = time.time()
+
+    dataBuffer = []
+    while True:
+        inData = connection.recv(1024)
+        if inData:
+            dataBuffer.append(inData.decode("utf8"))
+        else:
+            break
+
+    dataToString = ''.join(dataBuffer).strip()
+
+    dataSplit = dataToString.split(' ')
+    pixData = [float(i) for i in dataSplit]
+
+    stop = time.time()
+
+    print("Data Receive Duration:", (stop - start))
+    rounds.append((stop - start))
+
+    connection.close()
+
+print("\nAverage:", float(sum(rounds)) / len(rounds))
+
+s.close()
+# sendData = "Received: "+dataToString
+# connection.sendall(sendData.encode("ascii"))

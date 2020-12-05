@@ -2,8 +2,10 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <vector>
+#include <sstream>
 
-#define PORT 8083
+#define PORT 8084
 
 using namespace std;
 
@@ -11,7 +13,6 @@ int main() {
 	int sock, readIn;
 	struct sockaddr_in server_address{};
 
-	string message = "Hello from C++";
 	char inputBuffer[1024] = {0};
 
 
@@ -33,22 +34,34 @@ int main() {
 	}
 
 	//// Connection worked and everything
-	if (send(sock, message.c_str(), message.length(), 0) < 0) {
-		cout << "Message fail to send!" << endl;
-		return -1;
+	float *pixData;
+	size_t pixDataSize = 1920 * 1080 * 4 * sizeof(float);
+	cudaMallocManaged(&pixData, pixDataSize);
+	pixData[0] = 1.83f;
+	pixData[1] = 2.0f;
+
+	stringstream ss;
+	for (int i = 0; i < pixDataSize / sizeof(float); i++) {
+		ss << pixData[i] << ' ';
 	}
+
+
+//	send(sock, data.data(), data.size(), 0);
+	send(sock, ss.str().c_str(), ss.str().length(), 0);
 
 	cout << "Message sent!" << endl;
 
 	/// Get input
-	readIn = read(sock, inputBuffer, 1024);
-	if (readIn > 0) {
-		cout << "Input: " << inputBuffer << endl;
-	} else if (readIn == 0) {
-		cout << "EOF" << endl;
-	} else {
-		cout << "Error reading input" << endl;
-	}
+//	readIn = read(sock, inputBuffer, 1024);
+//	if (readIn > 0) {
+//		cout << "Input: " << inputBuffer << endl;
+//	} else if (readIn == 0) {
+//		cout << "EOF" << endl;
+//	} else {
+//		cout << "Error reading input" << endl;
+//	}
 
+	close(sock);
+	cudaFree(pixData);
 	return 0;
 }
