@@ -18,6 +18,7 @@ class ObjectMoveX(bpy.types.Operator):
             obj.location.x += 1.0
 
         print(pac.add(6, 8))
+        print(pac.sum(8))
 
         return {'FINISHED'}
 
