@@ -1,6 +1,7 @@
 import socket
 import subprocess
 import time
+import os
 
 HOST = 'localhost'
 PORT = 8084
@@ -9,11 +10,17 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.bind((HOST, PORT))
 s.listen(1)
 
-rounds = []
+# Detect what script to use
+scriptFile = ""
+if "Pre-work" in os.path.dirname(os.path.realpath(__file__)):
+    scriptFile = "/media/microbobu/WorkDrive/Tech/ERPT-Render-Engine/Pre-work/CudaSocket/cmake-build-debug/CudaSocket"
+else:
+    scriptFile = "./bin/CudaSocket"
 
+print("Start:")
+rounds = []
 for i in range(4):
-    p = subprocess.Popen(["/media/microbobu/WorkDrive/Tech/ERPT-Render-Engine/Pre-work/CudaSocket/cmake-build-debug"
-                          "/CudaSocket"], shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen([scriptFile], shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     connection, address = s.accept()
 
