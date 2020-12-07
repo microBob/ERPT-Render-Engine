@@ -9,6 +9,9 @@ moduleNames = ["engine"]
 
 import sys
 import importlib
+import bpy
+from bpy.types import AddonPreferences
+from bpy.props import StringProperty
 
 # Import Modules
 moduleFullNames = {}
@@ -24,11 +27,28 @@ for currentModuleFullName in moduleFullNames.values():
 
 
 # Run register and unregister functions
+class EngineAddonPreferences(AddonPreferences):
+    bl_idname = __package__
+
+    engineExecutablePath: StringProperty(
+        name="Engine Executable",
+        description="Path to ERPT Engine executable. Downloaded from its GitHub",
+        subtype="FILE_PATH"
+    )
+
+    # noinspection PyUnresolvedReferences
+    def draw(self, _):
+        layout = self.layout
+        layout.label(text="ERPT Engine Preferences")
+        layout.prop(self, "engineExecutablePath")
+
+
 def register():
     for curModuleName in moduleFullNames.values():
         if curModuleName in sys.modules:
             if hasattr(sys.modules[curModuleName], 'register'):
                 sys.modules[curModuleName].register()
+    bpy.utils.register_class(EngineAddonPreferences)
 
 
 def unregister():
@@ -36,6 +56,7 @@ def unregister():
         if curModuleName in sys.modules:
             if hasattr(sys.modules[curModuleName], 'unregister'):
                 sys.modules[curModuleName].unregister()
+    bpy.utils.unregister_class(EngineAddonPreferences)
 
 
 if __name__ == "__main__":

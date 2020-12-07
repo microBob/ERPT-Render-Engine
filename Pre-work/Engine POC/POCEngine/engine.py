@@ -12,12 +12,14 @@ class POCEngine(bpy.types.RenderEngine):
     bl_use_postprocess = True
     # bl_use_save_buffers = True    # Worth investigating
     bl_use_shading_nodes_custom = False
-    
 
     # Init is called whenever a new render engine instance is created. Multiple
     # instances may exist at the same time, for example for a viewport and final
     # render.
     def __init__(self):
+        self.size_y = 0
+        self.size_x = 0
+
         self.scene_data = None
         self.draw_data = None
 
@@ -30,9 +32,14 @@ class POCEngine(bpy.types.RenderEngine):
     # small preview for materials, world and lights.
     def render(self, depsgraph):
         scene = depsgraph.scene
+        engine_exe = bpy.context.preferences.addons[__package__].preferences.engineExecutablePath
         scale = scene.render.resolution_percentage / 100.0
-        self.size_x = int(scene.render.resolution_x * scale)
         self.size_y = int(scene.render.resolution_y * scale)
+        self.size_x = int(scene.render.resolution_x * scale)
+
+        print("Engine Exe:", engine_exe)
+        if engine_exe[-4] != "5":
+            raise FileExistsError("Invalid Engine exe")
 
         # Fill the render result with a flat color. The framebuffer is
         # defined as a list of pixels, each pixel itself being a list of
@@ -207,15 +214,17 @@ def register():
     bpy.utils.register_class(POCEngine)
 
     for panel in get_panels():
-        panel.COMPAT_ENGINES.add('CUSTOM')
+        panel.COMPAT_ENGINES.add('POCENGINE')
+
+    print("Engine Registered")
 
 
 def unregister():
     bpy.utils.unregister_class(POCEngine)
 
     for panel in get_panels():
-        if 'CUSTOM' in panel.COMPAT_ENGINES:
-            panel.COMPAT_ENGINES.remove('CUSTOM')
+        if 'POCENGINE' in panel.COMPAT_ENGINES:
+            panel.COMPAT_ENGINES.remove('POCENGINE')
 
 
 if __name__ == "__main__":
