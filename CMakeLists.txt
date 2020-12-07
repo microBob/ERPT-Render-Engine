@@ -1,18 +1,15 @@
 cmake_minimum_required(VERSION 3.17)
-project(PythonAndC CUDA CXX)
+project(ERPT_Render_Engine CUDA CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_subdirectory(../../External/pybind11 ../../External/pybind11/build)
-
-pybind11_add_module(${PROJECT_NAME} main.cpp)
+add_executable(ERPT_Render_Engine main.cpp src/kernels.cu include/kernels.cuh)
 
 set_target_properties(
 	${PROJECT_NAME}
 	PROPERTIES
 	CUDA_SEPARABLE_COMPILATION ON
 )
-
 target_compile_options(
 	${PROJECT_NAME}
 	PRIVATE
@@ -27,7 +24,5 @@ target_include_directories(
 target_link_libraries(
 	${PROJECT_NAME}
 	PRIVATE
-	"/usr/lib/cuda-10.2/lib64/libcublas.so"
-	"/usr/lib/cuda-10.2/lib64/libcudart.so"
-#	-lcublas
+	-lcublas
 )

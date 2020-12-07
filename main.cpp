@@ -1,13 +1,4 @@
-#include <iostream>
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <vector>
-#include <sstream>
-
-#define PORT 8084
-
-using namespace std;
+#include "include/kernels.cuh"
 
 int main() {
 	int sock, readIn;
@@ -22,7 +13,7 @@ int main() {
 	}
 
 	server_address.sin_family = AF_INET;
-	server_address.sin_port = htons(PORT);
+	server_address.sin_port = htons(SOCKET_PORT);
 
 	if (inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr) <= 0) {
 		cout << "Invalid Address" << endl;
