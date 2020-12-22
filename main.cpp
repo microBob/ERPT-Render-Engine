@@ -57,25 +57,26 @@ int main() {
 	fill_n(pixData, pixDataSize / sizeof(float), 1.0f);
 
 	cout << "Begin Conversion" << endl;
-
 	auto beforeConvert = high_resolution_clock::now();
 
-	stringstream ss;
-	ss << '['; // Start with array open
+	StringBuffer json;
+	Writer<StringBuffer> writer(json);
+
+	writer.StartArray();
 	for (int i = 0; i < pixDataSize / sizeof(float) / 4; ++i) {
-		ss << '[';
-		for (int j = 0; j < 4; ++j) { // Write in python eval
-			ss << "float(" << (int) (pixData[i] * pow(10, floatPrecision)) << ")/(10**" << floatPrecision << "),";
+		writer.StartArray();
+		for (int j = 0; j < 4; ++j) {
+			writer.Double(pixData[i * 4 + j]);
 		}
-		ss << "],";
+		writer.EndArray();
 	}
-	ss << ']';
+	writer.EndArray();
 
 	auto afterConvert = high_resolution_clock::now();
 	int convertDur = duration_cast<milliseconds>(afterConvert - beforeConvert).count();
 	cout << "Conversion Duration: " << convertDur << endl;
 
-	write(sock, ss.str().c_str(), ss.str().length());
+	write(sock, json.GetString(), json.GetLength());
 
 	auto afterSend = high_resolution_clock::now();
 	int sendDur = duration_cast<milliseconds>(afterSend - afterConvert).count();

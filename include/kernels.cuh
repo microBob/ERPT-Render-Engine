@@ -18,10 +18,15 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sstream>
+/// RapidJSON
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
 
 //// Namespaces
 using namespace std;
+using namespace rapidjson;
 using namespace chrono;
 
 
