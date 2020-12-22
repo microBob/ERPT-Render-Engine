@@ -10,6 +10,8 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <assert.h>
+#include <cmath>
+#include <cstring>
 #include <chrono>
 /// Sockets
 #include <sys/socket.h>
@@ -33,4 +35,6 @@ using namespace chrono;
 //// Kernel Functions
 
 
+//// CPU Functions
+int detectFloatPrecision();
 #endif //ERPT_RENDER_ENGINE_KERNELS_CUH
