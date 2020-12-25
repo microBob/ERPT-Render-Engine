@@ -27,32 +27,33 @@ int main() {
 		return -1;
 	}
 
-	//// SECTION: Convert and send data
-	/// Setup pixData
+
+	//// SECTION: Read in render data
+	// TODO: infinite read in from socket
+//	char resolutionInputBuffer[32] = {0};
+//	int resolutionReadIn = read(sock, resolutionInputBuffer, 32);
+//
+//	if (resolutionReadIn > 0) { // Received something
+//		// Parse input
+//		char *resolution[2];
+//		resolution[0] = strtok(resolutionInputBuffer, " ");
+//		resolution[1] = strtok(nullptr, " ");
+//		// Convert to int
+//		unsigned int resolutionX = strtol(resolution[0], nullptr, 10);
+//		unsigned int resolutionY = strtol(resolution[1], nullptr, 10);
+//
+//		pixDataSize = resolutionX * resolutionY * 4 * sizeof(float); // set pixDataSize based on input
+//	} else if (resolutionReadIn == 0) {
+//		cerr << "[ERROR]: EOF on reading resolution input" << endl;
+//	} else {
+//		cerr << "[ERROR]: On reading resolution reading input" << endl;
+//	}
+
+	//// SECTION: Setup pixData
 	float *pixData;
 	size_t pixDataSize = 1920 * 1080 * 4 * sizeof(float); // Assume 1080 in case of read failure
 
-	char resolutionInputBuffer[32] = {0};
-	int resolutionReadIn = read(sock, resolutionInputBuffer, 32);
-
-	if (resolutionReadIn > 0) { // Received something
-		cout << "Input: " << resolutionInputBuffer << endl;
-
-		// Parse input
-		char *resolution[2];
-		resolution[0] = strtok(resolutionInputBuffer, " ");
-		resolution[1] = strtok(nullptr, " ");
-		// Convert to int
-		unsigned int resolutionX = strtol(resolution[0], nullptr, 10);
-		unsigned int resolutionY = strtol(resolution[1], nullptr, 10);
-
-		pixDataSize = resolutionX * resolutionY * 4 * sizeof(float); // set pixDataSize based on input
-	} else if (resolutionReadIn == 0) {
-		cerr << "[ERROR]: EOF on reading resolution input" << endl;
-	} else {
-		cerr << "[ERROR]: On reading resolution reading input" << endl;
-	}
-
+	//// SECTION: Convert and send data
 	cudaMallocManaged(&pixData, pixDataSize);
 	fill_n(pixData, pixDataSize / sizeof(float), 1.0f);
 
