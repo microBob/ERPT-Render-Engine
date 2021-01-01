@@ -29,25 +29,43 @@ int main() {
 
 
 	//// SECTION: Read in render data
-	// TODO: infinite read in from socket
-//	char resolutionInputBuffer[32] = {0};
-//	int resolutionReadIn = read(sock, resolutionInputBuffer, 32);
-//
-//	if (resolutionReadIn > 0) { // Received something
-//		// Parse input
-//		char *resolution[2];
-//		resolution[0] = strtok(resolutionInputBuffer, " ");
-//		resolution[1] = strtok(nullptr, " ");
-//		// Convert to int
-//		unsigned int resolutionX = strtol(resolution[0], nullptr, 10);
-//		unsigned int resolutionY = strtol(resolution[1], nullptr, 10);
-//
-//		pixDataSize = resolutionX * resolutionY * 4 * sizeof(float); // set pixDataSize based on input
-//	} else if (resolutionReadIn == 0) {
-//		cerr << "[ERROR]: EOF on reading resolution input" << endl;
-//	} else {
-//		cerr << "[ERROR]: On reading resolution reading input" << endl;
-//	}
+	cout << "Reading in data" << endl;
+
+	vector<char> dataBuffer; // Render data buffer
+
+	// Data buffer size needed calculation
+	unsigned long dataSize = -1;
+	int indexOfDataStart;
+	unsigned long dataReadIn = 0;
+
+	do {
+		char smallDataBuffer[1024];
+		int dataIn = read(sock, smallDataBuffer, 1024);
+
+		if (dataSize == -1) {
+			indexOfDataStart = int(strchr(smallDataBuffer, '{') - smallDataBuffer);
+			dataSize = 0;
+			for (unsigned long i = 0; i < indexOfDataStart; ++i) {
+				int digitConvert = (int) smallDataBuffer[i] - 48;
+				dataSize += digitConvert * (unsigned long) pow(10, i);
+			}
+		}
+
+		if (dataIn > 0) {
+			for (int i = (dataReadIn == 0) ? indexOfDataStart : 0; i < dataIn; ++i) {
+				dataReadIn++;
+				dataBuffer.push_back(smallDataBuffer[i]);
+			}
+		} else if (dataIn == 0) {
+			cerr << "[ERROR]: EOF on reading in render data" << endl;
+			break;
+		} else {
+			cerr << "[ERROR]: on reading in render data" << endl;
+			break;
+		}
+	} while (dataReadIn + 1 < dataSize);
+
+	string dataString(dataBuffer.begin(), dataBuffer.end());
 
 	//// SECTION: Setup pixData
 	float *pixData;

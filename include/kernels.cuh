@@ -10,6 +10,7 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <assert.h>
+#include <vector>
 #include <cmath>
 #include <cstring>
 #include <chrono>
