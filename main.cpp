@@ -5,8 +5,6 @@ int main() {
 	int sock;
 	struct sockaddr_in server_address{};
 
-	int floatPrecision = detectFloatPrecision();
-
 	//// SECTION: Connect Socket
 	cout << "Connecting to addon" << endl;
 
@@ -42,6 +40,7 @@ int main() {
 		char smallDataBuffer[1024];
 		int dataIn = read(sock, smallDataBuffer, 1024);
 
+		// Parse and calculate data size
 		if (dataSize == -1) {
 			indexOfDataStart = int(strchr(smallDataBuffer, '{') - smallDataBuffer);
 			dataSize = 0;
@@ -51,6 +50,7 @@ int main() {
 			}
 		}
 
+		// Read and buffer input
 		if (dataIn > 0) {
 			for (int i = (dataReadIn == 0) ? indexOfDataStart : 0; i < dataIn; ++i) {
 				dataReadIn++;
@@ -65,11 +65,21 @@ int main() {
 		}
 	} while (dataReadIn + 1 < dataSize);
 
-	string dataString(dataBuffer.begin(), dataBuffer.end());
+	// Read and parse render data into JSON
+	string dataString(dataBuffer.begin(), dataBuffer.end()); // Convert buffer into string
+	Document renderDataDOM;
+	renderDataDOM.Parse(dataString.c_str());
 
 	//// SECTION: Setup pixData
 	float *pixData;
-	size_t pixDataSize = 1920 * 1080 * 4 * sizeof(float); // Assume 1080 in case of read failure
+
+	// Extract resolution
+	assert(renderDataDOM[RESOLUTION].IsArray());
+	const Value& resolutionData = renderDataDOM[RESOLUTION];
+	assert(resolutionData[0].IsNumber());
+	assert(resolutionData[1].IsNumber());
+
+	size_t pixDataSize = resolutionData[0].GetFloat() * resolutionData[1].GetFloat() * 4 * sizeof(float); // Assume 1080 in case of read failure
 
 	//// SECTION: Convert and send data
 	cudaMallocManaged(&pixData, pixDataSize);

@@ -3,7 +3,7 @@ project(ERPT_Render_Engine CUDA CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(ERPT_Render_Engine main.cpp src/kernels.cu include/kernels.cuh src/cpuFunctions.cpp)
+add_executable(ERPT_Render_Engine main.cpp src/kernels.cu src/cpuFunctions.cpp include/kernels.cuh include/constants.h)
 add_executable(LABS_Convert labs/convertLabs.cpp)
 
 set_target_properties(
