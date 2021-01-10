@@ -3,7 +3,15 @@ project(ERPT_Render_Engine CUDA CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(ERPT_Render_Engine main.cpp src/kernels.cu src/cpuFunctions.cpp include/kernels.cuh include/constants.h)
+find_package(CUDAToolkit)
+
+add_executable(
+	ERPT_Render_Engine
+	main.cpp include/main.h
+	include/constants.h
+	include/communication.h src/communication.cpp
+	include/kernels.cuh
+)
 add_executable(LABS_Convert labs/convertLabs.cpp)
 
 set_target_properties(
@@ -20,11 +28,11 @@ target_compile_options(
 target_include_directories(
 	${PROJECT_NAME}
 	PRIVATE
-	${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 	include
 )
 target_link_libraries(
 	${PROJECT_NAME}
 	PRIVATE
-	-lcublas
+	CUDA::cudart
+	CUDA::cublas
 )

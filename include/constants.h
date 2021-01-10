@@ -5,24 +5,29 @@
 #ifndef ERPT_RENDER_ENGINE_CONSTANTS_H
 #define ERPT_RENDER_ENGINE_CONSTANTS_H
 
-// Render data DOM elements
-#define SCENE "SCENE"
-#define RESOLUTION "RESOLUTION"
+//// SECTION: Render data DOM elements
+constexpr char SCENE[] = "SCENE";
+constexpr char RESOLUTION[] = "RESOLUTION";
 
-#define MESHES "MESHES"
-#define VERTICES "VERTICES"
-#define FACES "FACES"
-#define NORMAL "NORMAL"
+constexpr char MESHES[] = "MESHES";
+constexpr char VERTICES[] = "VERTICES";
+constexpr char FACES[] = "FACES";
+constexpr char NORMAL[] = "NORMAL";
 
-#define LIGHTS "LIGHTS"
-#define TYPE "TYPE"
-#define LOCATION "LOCATION"
-#define COLOR "COLOR"
-#define ENERGY "ENERGY"
+constexpr char LIGHTS[] = "LIGHTS";
+constexpr char TYPE[] = "TYPE";
+constexpr char LOCATION[] = "LOCATION";
+constexpr char ROTATION[] = "ROTATION";
+constexpr char COLOR[] = "COLOR";
+constexpr char ENERGY[] = "ENERGY";
 
-#define CAMERAS "CAMERAS"
-#define LOCATION "LOCATION"
-#define ROTATION "ROTATION"
+constexpr char CAMERAS[] = "CAMERAS";
+constexpr char FOV[] = "FOV";
+constexpr char CLIP[] = "CLIP";
+
+
+//// SECTION: Socket
+constexpr int SOCKET_PORT = 8083;
 
 
 #endif //ERPT_RENDER_ENGINE_CONSTANTS_H
