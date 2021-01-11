@@ -3,12 +3,7 @@
 //
 #include "../include/communication.h"
 
-//// SECTION: Socket Variables
-int sock;
-struct sockaddr_in server_address{};
-
-//// SECTION: Methods
-bool connectSocket() {
+bool Communication::ConnectSocket() {
 	cout << "Connecting to addon" << endl;
 
 	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -31,7 +26,11 @@ bool connectSocket() {
 	return true;
 }
 
-Document receiveData() {
+void Communication::DisconnectSocket() const {
+	close(sock);
+}
+
+Document Communication::ReceiveData() const {
 	cout << "Reading in data" << endl;
 
 	vector<char> dataBuffer; // Render data buffer
@@ -79,7 +78,7 @@ Document receiveData() {
 	return renderDataDOM;
 }
 
-void convertAndSend(float *pixData, size_t pixDataSize) {
+void Communication::ConvertAndSend(float *pixData, size_t pixDataSize) const {
 	cout << "Begin Conversion" << endl;
 	auto beforeConvert = high_resolution_clock::now();
 
@@ -106,8 +105,4 @@ void convertAndSend(float *pixData, size_t pixDataSize) {
 	int sendDur = duration_cast<milliseconds>(afterSend - afterConvert).count();
 
 	cout << "Message sent! Took: " << sendDur << endl;
-}
-
-void disconnectSocket() {
-	close(sock);
 }

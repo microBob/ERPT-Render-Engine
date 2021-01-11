@@ -11,7 +11,7 @@ add_executable(
 	include/constants.h
 	include/communication.h src/communication.cpp
 	include/kernels.cuh
-)
+	include/transformations.cuh src/transformations.cu src/kernels.cu)
 add_executable(LABS_Convert labs/convertLabs.cpp)
 
 set_target_properties(

@@ -8,10 +8,7 @@
 //// Includes
 /// Main
 #include <iostream>
-#include <cassert>
-#include <vector>
 #include <cmath>
-#include <cstring>
 #include <chrono>
 #include "constants.h"
 /// RapidJSON
@@ -25,7 +22,6 @@ using namespace chrono;
 
 
 //// Models
-
 
 //// CPU Functions
 #endif //ERPT_RENDER_ENGINE_MAIN_H

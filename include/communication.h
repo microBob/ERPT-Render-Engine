@@ -7,6 +7,7 @@
 
 //// SECTION: Includes
 #include "main.h"
+#include <vector>
 /// Socket
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -18,11 +19,17 @@
 #include "rapidjson/stringbuffer.h"
 
 
-//// SECTION: Methods
-bool connectSocket(); // Return true on success
-Document receiveData(); // Return data from addon as a DOM
-void convertAndSend(float *pixData, size_t pixDataSize);
-void disconnectSocket();
+//// SECTION: Class definition
+class Communication {
+private:
+	int sock;
+	struct sockaddr_in server_address{};
+public:
+	bool ConnectSocket(); // Return true on success
+	void DisconnectSocket() const;
 
+	Document ReceiveData() const; // Return data from addon as a DOM
+	void ConvertAndSend(float *pixData, size_t pixDataSize) const;
+};
 
 #endif //ERPT_RENDER_ENGINE_COMMUNICATION_H

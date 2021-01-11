@@ -1,14 +1,21 @@
 #include "include/main.h"
 #include "include/kernels.cuh"
 #include "include/communication.h"
+#include "include/transformations.cuh"
 
 int main() {
+	//// SECTION: Variables and instances
+	Communication com;
+	Transformations transformations;
+
+
 	//// SECTION: Connect to addon and read in data
-	if (!connectSocket()) {
+	if (!com.ConnectSocket()) {
 		return -1;
 	}
 
-	Document renderDataDOM = receiveData();
+	Document renderDataDOM = com.ReceiveData();
+
 
 	//// SECTION: Setup pixData
 	float *pixData;
@@ -25,10 +32,35 @@ int main() {
 	cudaMallocManaged(&pixData, pixDataSize);
 	fill_n(pixData, pixDataSize / sizeof(float), 1.0f);
 
-	//// SECTION: Convert and send data
-	convertAndSend(pixData, pixDataSize);
 
-	disconnectSocket();
+	//// SECTION: Convert to Camera space
+	/// Create camera matrix
+	// Verify camera data exists
+	assert(renderDataDOM[CAMERAS].IsObject());
+	// Verify location data exists
+	assert(renderDataDOM[CAMERAS][LOCATION].IsArray());
+	const Value &cameraLocation = renderDataDOM[CAMERAS][LOCATION];
+	for (int i = 0; i < 3; ++i) {
+		assert(cameraLocation[i].IsNumber());
+	}
+	// Verify rotation data exists
+	assert(renderDataDOM[CAMERAS][ROTATION].IsArray());
+	const Value &cameraRotation = renderDataDOM[CAMERAS][ROTATION];
+	for (int i = 0; i < 3; ++i) {
+		assert(cameraRotation[i].IsNumber());
+	}
+	// Once all Verified, set translation matrix
+	transformations.set_worldToCameraMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
+	                                        cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
+	                                        cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat());
+
+
+
+
+	//// SECTION: Convert and send data
+	com.ConvertAndSend(pixData, pixDataSize);
+
+	com.DisconnectSocket();
 	cudaFree(pixData);
 	return 0;
 }
