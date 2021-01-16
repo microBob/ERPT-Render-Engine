@@ -6,9 +6,8 @@
 int main() {
 	//// SECTION: Variables and instances
 	/// Class instances
-	static Kernels k;
 	Communication com;
-	Transformations transformations(k);
+	Transformations transformations;
 
 	/// Major data variables
 	Document renderDataDOM;
@@ -37,6 +36,7 @@ int main() {
 	                     sizeof(float); // Assume 1080 in case of read failure
 
 	cudaMallocManaged(&pixData, pixDataSize);
+	cudaMemPrefetchAsync(pixData, pixDataSize, k.get_cpuID());
 	fill_n(pixData, pixDataSize / sizeof(float), 1.0f);
 
 
@@ -71,8 +71,8 @@ int main() {
 	// Malloc vertices data
 	sceneVerticesByteSize = 4 * rawVertices.size() * sizeof(float);
 	cudaMallocManaged(&sceneVertices, sceneVerticesByteSize);
-	// Transfer too CPU
-	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetPreferredLocation, k.get_cpuID());
+	// Transfer to CPU
+	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_cpuID());
 	// Set values
 	sceneVertices = &rawVertices[0];
 	// Switch to GPU
@@ -80,12 +80,19 @@ int main() {
 	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_gpuID());
 
+	/// Convert vertices to camera space
+	transformations.convertVerticesToCameraSpace(sceneVertices, (int) (sceneVerticesByteSize / sizeof(float)));
+
 
 
 	//// SECTION: Convert and send data
 	com.ConvertAndSend(pixData, pixDataSize);
 
+
+	//// SECTION: Cleanup
 	com.DisconnectSocket();
 	cudaFree(pixData);
+	cudaFree(sceneVertices);
+	transformations.cleanup();
 	return 0;
 }

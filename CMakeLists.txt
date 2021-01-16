@@ -12,8 +12,9 @@ add_executable(
 	include/communication.h src/communication.cpp
 	include/kernels.cuh
 	include/transformations.cuh src/transformations.cu src/kernels.cu)
-add_executable(LABS labs/vectorLabs.cpp)
+add_executable(LABS labs/labs.cpp labs/another.h include/kernels.cuh)
 
+# For project
 set_target_properties(
 	${PROJECT_NAME}
 	PROPERTIES
@@ -32,6 +33,30 @@ target_include_directories(
 )
 target_link_libraries(
 	${PROJECT_NAME}
+	PRIVATE
+	CUDA::cudart
+	CUDA::cublas
+)
+
+# Copy for Labs
+set_target_properties(
+	LABS
+	PROPERTIES
+	CUDA_SEPARABLE_COMPILATION ON
+)
+target_compile_options(
+	LABS
+	PRIVATE
+	$<$<COMPILE_LANGUAGE:CUDA>:
+	-gencode arch=compute_61,code=sm_61>
+)
+target_include_directories(
+	LABS
+	PRIVATE
+	include
+)
+target_link_libraries(
+	LABS
 	PRIVATE
 	CUDA::cudart
 	CUDA::cublas
