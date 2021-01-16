@@ -15,6 +15,8 @@ int main() {
 	}
 
 	Document renderDataDOM = com.ReceiveData();
+	assert(renderDataDOM.HasMember(SCENE));
+	assert(renderDataDOM[SCENE].IsObject());
 
 
 	//// SECTION: Setup pixData
@@ -36,16 +38,16 @@ int main() {
 	//// SECTION: Convert to Camera space
 	/// Create camera matrix
 	// Verify camera data exists
-	assert(renderDataDOM[CAMERAS].IsObject());
+	assert(renderDataDOM[SCENE][CAMERA].IsObject());
 	// Verify location data exists
-	assert(renderDataDOM[CAMERAS][LOCATION].IsArray());
-	const Value &cameraLocation = renderDataDOM[CAMERAS][LOCATION];
+	assert(renderDataDOM[SCENE][CAMERA][LOCATION].IsArray());
+	const Value &cameraLocation = renderDataDOM[SCENE][CAMERA][LOCATION];
 	for (int i = 0; i < 3; ++i) {
 		assert(cameraLocation[i].IsNumber());
 	}
 	// Verify rotation data exists
-	assert(renderDataDOM[CAMERAS][ROTATION].IsArray());
-	const Value &cameraRotation = renderDataDOM[CAMERAS][ROTATION];
+	assert(renderDataDOM[SCENE][CAMERA][ROTATION].IsArray());
+	const Value &cameraRotation = renderDataDOM[SCENE][CAMERA][ROTATION];
 	for (int i = 0; i < 3; ++i) {
 		assert(cameraRotation[i].IsNumber());
 	}
@@ -54,6 +56,8 @@ int main() {
 	                                        cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
 	                                        cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat());
 
+	/// Decompose mesh data into vertices
+	
 
 
 

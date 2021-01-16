@@ -67,3 +67,7 @@ void Transformations::set_perspectiveMatrix(float screenWidth, float screenHeigh
 float *Transformations::get_perspectiveMatrix() {
 	return perspectiveMatrix;
 }
+
+void Transformations::convertVerticesToCameraSpace(float *vertices) {
+
+}

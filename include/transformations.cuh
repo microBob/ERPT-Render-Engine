@@ -15,8 +15,11 @@ class Transformations {
 private:
 	Kernels k;
 	static const size_t matrixByteSize = 16 * sizeof(float);
+
 	float *worldToCameraMatrix{};
 	float *perspectiveMatrix{};
+
+	float *convertedVertices;
 public:
 	Transformations();
 
@@ -27,6 +30,8 @@ public:
 	void set_perspectiveMatrix(float screenWidth, float screenHeight, float fovRadians, float zFar, float zNear);
 
 	float *get_perspectiveMatrix();
+
+	void convertVerticesToCameraSpace(float *vertices);
 
 };
 

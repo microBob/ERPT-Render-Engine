@@ -21,7 +21,8 @@ constexpr char ROTATION[] = "ROTATION";
 constexpr char COLOR[] = "COLOR";
 constexpr char ENERGY[] = "ENERGY";
 
-constexpr char CAMERAS[] = "CAMERAS";
+constexpr char CAMERA[] = "CAMERA";
+constexpr char DIRECTION[] = "DIRECTION";
 constexpr char FOV[] = "FOV";
 constexpr char CLIP[] = "CLIP";
 
