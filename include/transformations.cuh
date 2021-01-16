@@ -23,14 +23,16 @@ private:
 	const float beta = 0.0f;
 
 	// Matrix sizes
-	static const size_t matrixByteSize = 16 * sizeof(float);
+	const size_t matrixByteSize = 16 * sizeof(float);
+	size_t expandedMatrixByteSize;
 
 	// Single matrix instance (expand for cublas by implementation)
 	float *worldToCameraMatrix = (float *) malloc(matrixByteSize);
 	float *perspectiveMatrix = (float *) malloc(matrixByteSize);
 
-	// Converted matrices
-	float *convertedVertices;
+	// Converted vertices
+	float *cameraVertices;
+	float *screenVertices;
 public:
 	Transformations() {
 		cublasCreate(&handle);
@@ -52,7 +54,8 @@ public:
 		free(worldToCameraMatrix);
 		free(perspectiveMatrix);
 
-		cudaFree(convertedVertices);
+		cudaFree(cameraVertices);
+		cudaFree(screenVertices);
 
 		cublasDestroy(handle);
 	}

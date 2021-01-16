@@ -55,7 +55,7 @@ void Transformations::convertVerticesToCameraSpace(float *vertices, const int ve
 	/// Expand worldToCameraMatrix
 	// Define and malloc expanded matrix
 	float *expandedWorldToCameraMatrix;
-	size_t expandedMatrixByteSize = vertexCount * matrixByteSize;
+	expandedMatrixByteSize = vertexCount * matrixByteSize;
 	cudaMallocManaged(&expandedWorldToCameraMatrix, expandedMatrixByteSize);
 	cudaMemPrefetchAsync(expandedWorldToCameraMatrix, expandedMatrixByteSize, k.get_cpuID());
 	// Copy
@@ -69,18 +69,49 @@ void Transformations::convertVerticesToCameraSpace(float *vertices, const int ve
 	              k.get_gpuID());
 	cudaMemPrefetchAsync(expandedWorldToCameraMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
 
-	/// Initialize convertedVertices
-	cudaMallocManaged(&convertedVertices, vertexCount * sizeof(float));
-	cudaMemAdvise(convertedVertices, vertexCount * sizeof(float), cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(convertedVertices, vertexCount * sizeof(float), k.get_gpuID());
+	/// Initialize cameraVertices
+	cudaMallocManaged(&cameraVertices, vertexCount * sizeof(float));
+	cudaMemAdvise(cameraVertices, vertexCount * sizeof(float), cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(cameraVertices, vertexCount * sizeof(float), k.get_gpuID());
 
 	/// cuBLAS
 	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha, expandedWorldToCameraMatrix,
-	                                   4, 16, vertices, 4, 4, &beta, convertedVertices, 4, 4, vertexCount);
+	                                   4, 16, vertices, 4, 4, &beta, cameraVertices, 4, 4, vertexCount);
 	cudaDeviceSynchronize();
 	assert(status == CUBLAS_STATUS_SUCCESS);
+
+	// Cleanup
+	cudaFree(expandedWorldToCameraMatrix);
 }
 
 void Transformations::convertToScreenSpace(const int vertexCount) {
+	/// Expand perspectiveMatrix
+	// Define and malloc expanded matrix
+	float *expandedPerspectiveMatrix;
+	cudaMallocManaged(&expandedPerspectiveMatrix, expandedMatrixByteSize);
+	cudaMemPrefetchAsync(expandedPerspectiveMatrix, expandedMatrixByteSize, k.get_cpuID());
+	// Copy
+	for (int i = 0; i < vertexCount; i += 16) {
+		copy(perspectiveMatrix, perspectiveMatrix + 16, expandedPerspectiveMatrix + i);
+	}
+	// Switch to GPU
+	cudaMemAdvise(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetPreferredLocation,
+	              k.get_gpuID());
+	cudaMemAdvise(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetReadMostly,
+	              k.get_gpuID());
+	cudaMemPrefetchAsync(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
 
+	/// Initialize screenVertices
+	cudaMallocManaged(&screenVertices, vertexCount * sizeof(float));
+	cudaMemAdvise(screenVertices, vertexCount * sizeof(float), cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(screenVertices, vertexCount * sizeof(float), k.get_gpuID());
+
+	/// cuBLAS
+	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha, expandedPerspectiveMatrix,
+	                                   4, 16, cameraVertices, 4, 4, &beta, screenVertices, 4, 4, vertexCount);
+	cudaDeviceSynchronize();
+	assert(status == CUBLAS_STATUS_SUCCESS);
+
+	// Cleanup
+	cudaFree(expandedPerspectiveMatrix);
 }
