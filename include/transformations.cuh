@@ -21,7 +21,7 @@ private:
 
 	float *convertedVertices;
 public:
-	Transformations();
+	Transformations(Kernels kernels);
 
 	float *get_worldToCameraMatrix();
 

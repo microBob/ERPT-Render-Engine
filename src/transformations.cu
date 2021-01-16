@@ -4,7 +4,7 @@
 #include "../include/transformations.cuh"
 
 
-Transformations::Transformations() {
+Transformations::Transformations(Kernels kernels) { // NOLINT(cppcoreguidelines-pro-type-member-init)
 	// Initialize into memory
 	cudaMallocManaged(&worldToCameraMatrix, matrixByteSize);
 	cudaMallocManaged(&perspectiveMatrix, matrixByteSize);

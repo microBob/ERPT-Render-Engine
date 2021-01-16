@@ -9,6 +9,7 @@
 /// Main
 #include <iostream>
 #include <cmath>
+#include <vector>
 #include <chrono>
 #include "constants.h"
 /// RapidJSON
