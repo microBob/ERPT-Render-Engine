@@ -42,11 +42,9 @@
 #     linelength: 100
 #     exclude: "test/*.c"
 
-# # https://help.sider.review/getting-started/custom-configuration#ignore
-# ignore:
-#   - "*.pdf"
-#   - "*.mp4"
-#   - "images/**"
+# https://help.sider.review/getting-started/custom-configuration#ignore
+ignore:
+  - "include/rapidjson/**"
 
 # # https://help.sider.review/getting-started/custom-configuration#branchesexclude
 # branches:
