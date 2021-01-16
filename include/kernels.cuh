@@ -20,7 +20,10 @@ private:
 public:
 	int get_gpuID() const;
 	int get_cpuID() const;
+	int testVar = 1;
 };
+
+static Kernels k;
 
 
 #endif //ERPT_RENDER_ENGINE_KERNELS_CUH

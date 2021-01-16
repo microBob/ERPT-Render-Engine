@@ -9,19 +9,32 @@
 #include "kernels.cuh"
 #include "cublas_v2.h"
 
+#include <iostream>
+#include <cassert>
+
 
 //// SECTION: Class definition
 class Transformations {
 private:
-	Kernels k;
+	// cuBLAS
+	cublasHandle_t handle;
+	cublasStatus_t status;
+	const float alpha = 1.0f;
+	const float beta = 0.0f;
+
+	// Matrix sizes
 	static const size_t matrixByteSize = 16 * sizeof(float);
 
-	float *worldToCameraMatrix{};
-	float *perspectiveMatrix{};
+	// Single matrix instance (expand for cublas by implementation)
+	float *worldToCameraMatrix = (float *) malloc(matrixByteSize);
+	float *perspectiveMatrix = (float *) malloc(matrixByteSize);
 
+	// Converted matrices
 	float *convertedVertices;
 public:
-	Transformations(Kernels kernels);
+	Transformations() {
+		cublasCreate(&handle);
+	}
 
 	float *get_worldToCameraMatrix();
 
@@ -31,8 +44,18 @@ public:
 
 	float *get_perspectiveMatrix();
 
-	void convertVerticesToCameraSpace(float *vertices);
+	void convertVerticesToCameraSpace(float *vertices, const int vertexCount);
 
+	void convertToScreenSpace(const int vertexCount);
+
+	void cleanup() {
+		free(worldToCameraMatrix);
+		free(perspectiveMatrix);
+
+		cudaFree(convertedVertices);
+
+		cublasDestroy(handle);
+	}
 };
 
 #endif //ERPT_RENDER_ENGINE_TRANSFORMATIONS_CUH
