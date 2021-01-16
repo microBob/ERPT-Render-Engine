@@ -60,10 +60,12 @@ int main() {
 	// Loop through every mesh in data
 	for (auto &mesh : meshDataDOM) {
 		auto meshVertices = mesh.FindMember(VERTICES)->value.GetArray(); // Get vertices from mesh
-		for (auto &vertex : meshVertices) {
-			rawVertices.push_back(vertex.GetFloat());
+		for (auto &vertex : meshVertices) { // Loop through each vertex
+			for (auto &coordinates : vertex.GetArray()) { // Loop through XYZ of vertex
+				rawVertices.push_back(coordinates.GetFloat());
+			}
+			rawVertices.push_back(1); // Add extra 1 to complete 4D vector
 		}
-		rawVertices.push_back(1); // Add extra 1 to complete 4D vector
 	}
 
 	// Malloc vertices data
