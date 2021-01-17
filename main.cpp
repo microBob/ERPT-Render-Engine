@@ -89,6 +89,8 @@ int main() {
 	/// Convert vertices to camera space
 	int sceneVertexCount = (int) rawVertices.size() / 4;
 	k.set_kernelThreadsAndBlocks(sceneVertexCount);
+	transformations.convertWorldToPerspectiveSpace(sceneVertices, sceneVertexCount);
+	transformations.convertPerspectiveToScreenSpace(sceneVertexCount, screenWidth, screenHeight);
 
 
 	//// SECTION: Convert and send data

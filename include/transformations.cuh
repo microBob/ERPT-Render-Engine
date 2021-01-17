@@ -24,7 +24,6 @@ private:
 
 	// Matrix sizes
 	const size_t matrixByteSize = 16 * sizeof(float);
-	size_t expandedMatrixByteSize;
 
 	// Single matrix instance (expand for cublas by implementation)
 	float *worldToPerspectiveMatrix = (float *) malloc(matrixByteSize);

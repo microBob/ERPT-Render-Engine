@@ -27,9 +27,9 @@ convertToScreenSpaceKernel(float *input, const int vertexCount, float *output, f
 
 		// Calculate final x and y
 		output[sceneToLinearGPU(tid, 0, 2)] =
-			input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenWidth / 2.0f;
+			input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenWidth;
 		output[sceneToLinearGPU(tid, 1, 2)] =
-			input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenHeight / 2.0f;
+			input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenHeight;
 
 		// Increment tid
 		tid += increment;
@@ -87,35 +87,37 @@ Transformations::set_worldToPerspectiveMatrix(float x, float y, float z, float d
 void Transformations::convertWorldToPerspectiveSpace(float *vertices, const int vertexCount) {
 	/// Expand worldToCameraMatrix
 	// Define and malloc expanded matrix
-	float *expandedWorldToCameraMatrix;
-	expandedMatrixByteSize = vertexCount * matrixByteSize;
-	cudaMallocManaged(&expandedWorldToCameraMatrix, expandedMatrixByteSize);
-	cudaMemPrefetchAsync(expandedWorldToCameraMatrix, expandedMatrixByteSize, k.get_cpuID());
+	float *expandedWorldToPerspectiveMatrix;
+	size_t expandedMatrixByteSize = vertexCount * matrixByteSize;
+	cudaMallocManaged(&expandedWorldToPerspectiveMatrix, expandedMatrixByteSize);
+	cudaMemPrefetchAsync(expandedWorldToPerspectiveMatrix, expandedMatrixByteSize, k.get_cpuID());
 	// Copy
 	for (int i = 0; i < vertexCount; ++i) {
-		copy(worldToCameraMatrix, worldToCameraMatrix + 16, expandedWorldToCameraMatrix + i * 16);
+		copy(worldToPerspectiveMatrix, worldToPerspectiveMatrix + 16, expandedWorldToPerspectiveMatrix + i * 16);
 	}
 	// Switch to GPU
-	cudaMemAdvise(expandedWorldToCameraMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetPreferredLocation,
+	cudaMemAdvise(expandedWorldToPerspectiveMatrix, vertexCount * expandedMatrixByteSize,
+	              cudaMemAdviseSetPreferredLocation,
 	              k.get_gpuID());
-	cudaMemAdvise(expandedWorldToCameraMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetReadMostly,
+	cudaMemAdvise(expandedWorldToPerspectiveMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetReadMostly,
 	              k.get_gpuID());
-	cudaMemPrefetchAsync(expandedWorldToCameraMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
+	cudaMemPrefetchAsync(expandedWorldToPerspectiveMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
 
 	/// Initialize cameraVertices
-	vertexCoCount = vertexCount * 4 * sizeof(float);
-	cudaMallocManaged(&cameraVertices, vertexCoCount);
-	cudaMemAdvise(cameraVertices, vertexCoCount, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(cameraVertices, vertexCoCount, k.get_gpuID());
+	unsigned int vertexCoCount = vertexCount * 4 * sizeof(float);
+	cudaMallocManaged(&perspectiveVertices, vertexCoCount);
+	cudaMemAdvise(perspectiveVertices, vertexCoCount, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(perspectiveVertices, vertexCoCount, k.get_gpuID());
 
 	/// cuBLAS
-	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha, expandedWorldToCameraMatrix,
-	                                   4, 16, vertices, 4, 4, &beta, cameraVertices, 4, 4, vertexCount);
+	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha,
+	                                   expandedWorldToPerspectiveMatrix,
+	                                   4, 16, vertices, 4, 4, &beta, perspectiveVertices, 4, 4, vertexCount);
 	cudaDeviceSynchronize();
 	assert(status == CUBLAS_STATUS_SUCCESS);
 
 	// Cleanup
-//	cudaFree(expandedWorldToCameraMatrix);
+//	cudaFree(expandedWorldToPerspectiveMatrix);
 }
 
 void Transformations::convertPerspectiveToScreenSpace(const int vertexCount, float screenWidth, float screenHeight) {
@@ -123,9 +125,13 @@ void Transformations::convertPerspectiveToScreenSpace(const int vertexCount, flo
 	cudaMallocManaged(&screenCoordinates, 2 * vertexCount * sizeof(float));
 	cudaMemPrefetchAsync(screenCoordinates, 2 * vertexCount * sizeof(float), k.get_gpuID());
 
+	// Half screen dimension
+	float halfWidth = screenWidth / 2;
+	float halfHeight = screenHeight / 2;
+
 	// Run kernel
 	convertToScreenSpaceKernel<<<k.get_threadsToLaunchForVertices(), k.get_blocksToLaunchForVertices()>>>(
-		perspectiveVertices, vertexCount, screenCoordinates, screenWidth, screenHeight);
+		perspectiveVertices, vertexCount, screenCoordinates, halfWidth, halfHeight);
 	cudaDeviceSynchronize();
 
 	// Cleanup
