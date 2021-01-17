@@ -15,6 +15,8 @@ int main() {
 	float *sceneVertices;
 	size_t sceneVerticesByteSize;
 
+	float screenWidth, screenHeight;
+
 
 	//// SECTION: Connect to addon and read in data
 	if (!com.ConnectSocket()) {
@@ -32,7 +34,10 @@ int main() {
 	// Extract resolution
 	auto resolutionData = renderDataDOM.FindMember(RESOLUTION)->value.GetArray();
 
-	size_t pixDataSize = resolutionData[0].GetFloat() * resolutionData[1].GetFloat() * 4 *
+	screenWidth = resolutionData[0].GetFloat();
+	screenHeight = resolutionData[1].GetFloat();
+
+	size_t pixDataSize = screenWidth * screenHeight * 4 *
 	                     sizeof(float); // Assume 1080 in case of read failure
 
 	cudaMallocManaged(&pixData, pixDataSize);
@@ -49,9 +54,10 @@ int main() {
 	// Verify rotation data exists
 	auto cameraRotation = cameraDataDOM.FindMember(ROTATION)->value.GetArray();
 	// Once all Verified, set translation matrix
-	transformations.set_worldToCameraMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
-	                                        cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
-	                                        cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat());
+	transformations.set_worldToPerspectiveMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
+	                                             cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
+	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(), 0, 0, 0, 0,
+	                                             0);
 
 	/// Decompose mesh data into vertices
 	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetArray();
@@ -69,7 +75,7 @@ int main() {
 	}
 
 	// Malloc vertices data
-	sceneVerticesByteSize = 4 * rawVertices.size() * sizeof(float);
+	sceneVerticesByteSize = rawVertices.size() * sizeof(float);
 	cudaMallocManaged(&sceneVertices, sceneVerticesByteSize);
 	// Transfer to CPU
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_cpuID());
@@ -80,9 +86,30 @@ int main() {
 	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_gpuID());
 
-	/// Convert vertices to camera space
-	transformations.convertVerticesToCameraSpace(sceneVertices, (int) (sceneVerticesByteSize / sizeof(float)));
+	int sceneVertexCount = (int) rawVertices.size() / 4;
+	/// Convert vertices from world to perspective
+	float *perspectiveVertices;
+	// Initialize output
+	cudaMallocManaged(&perspectiveVertices, sceneVerticesByteSize);
+	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
+	// Convert world to perspective
+	transformations.convertWorldToPerspectiveSpace(sceneVertices, sceneVertexCount, perspectiveVertices);
 
+	/// Convert perspective to screen coordinates
+	float *screenCoordinates;
+	// Initialize output
+	cudaMallocManaged(&screenCoordinates, sceneVerticesByteSize / 2);
+	cudaMemAdvise(screenCoordinates, sceneVerticesByteSize / 2, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(screenCoordinates, sceneVerticesByteSize / 2, k.get_gpuID());
+	// MemAdvise input
+	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
+	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
+	// Convert perspective to screen
+	k.set_kernelThreadsAndBlocks(sceneVertexCount);
+	transformations.convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
+	                                                screenCoordinates);
+	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
 
 
 	//// SECTION: Convert and send data
