@@ -28,9 +28,6 @@ private:
 	// Single matrix instance (expand for cublas by implementation)
 	float *worldToPerspectiveMatrix = (float *) malloc(matrixByteSize);
 
-	// Converted vertices
-	float *perspectiveVertices;
-	float *screenCoordinates;
 public:
 	Transformations() {
 		cublasCreate(&handle);
@@ -39,14 +36,13 @@ public:
 	void set_worldToPerspectiveMatrix(float x, float y, float z, float degX, float degY, float degZ, float fov,
 	                                  float screenWidth, float screenHeight, float zNear, float zFar);
 
-	void convertWorldToPerspectiveSpace(float *vertices, const int vertexCount);
+	void convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output);
 
-	void convertPerspectiveToScreenSpace(const int vertexCount, float screenWidth, float screenHeight);
+	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth, float screenHeight,
+	                                     float *output);
 
 	void cleanup() {
 		free(worldToPerspectiveMatrix);
-
-		cudaFree(perspectiveVertices);
 
 		cublasDestroy(handle);
 	}

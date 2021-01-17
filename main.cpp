@@ -86,11 +86,30 @@ int main() {
 	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_gpuID());
 
-	/// Convert vertices to camera space
 	int sceneVertexCount = (int) rawVertices.size() / 4;
+	/// Convert vertices from world to perspective
+	float *perspectiveVertices;
+	// Initialize output
+	cudaMallocManaged(&perspectiveVertices, sceneVerticesByteSize);
+	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
+	// Convert world to perspective
+	transformations.convertWorldToPerspectiveSpace(sceneVertices, sceneVertexCount, perspectiveVertices);
+
+	/// Convert perspective to screen coordinates
+	float *screenCoordinates;
+	// Initialize output
+	cudaMallocManaged(&screenCoordinates, sceneVerticesByteSize / 2);
+	cudaMemAdvise(screenCoordinates, sceneVerticesByteSize / 2, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(screenCoordinates, sceneVerticesByteSize / 2, k.get_gpuID());
+	// MemAdvise input
+	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
+	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
+	// Convert perspective to screen
 	k.set_kernelThreadsAndBlocks(sceneVertexCount);
-	transformations.convertWorldToPerspectiveSpace(sceneVertices, sceneVertexCount);
-	transformations.convertPerspectiveToScreenSpace(sceneVertexCount, screenWidth, screenHeight);
+	transformations.convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
+	                                                screenCoordinates);
+	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
 
 
 	//// SECTION: Convert and send data
