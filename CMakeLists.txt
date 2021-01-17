@@ -12,7 +12,7 @@ add_executable(
 	include/communication.h src/communication.cpp
 	include/kernels.cuh
 	include/transformations.cuh src/transformations.cu src/kernels.cu)
-add_executable(LABS labs/labs.cpp labs/another.h include/kernels.cuh)
+add_executable(LABS labs/labs.cpp labs/another.h)
 
 # For project
 set_target_properties(

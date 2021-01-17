@@ -7,6 +7,7 @@
 
 //// SECTION: Includes
 #include <cuda_runtime.h>
+#include <iostream>
 #include "device_launch_parameters.h"
 
 using namespace std;
@@ -15,12 +16,30 @@ using namespace std;
 //// SECTION: Cuda meta
 class Kernels {
 private:
+	cudaDeviceProp prop{};
+
 	int gpuID = cudaGetDevice(&gpuID);
 	const int cpuID = cudaCpuDeviceId;
+
+	int threadsToLaunchForVertices;
+	int blocksToLaunchForVertices;
 public:
-	int get_gpuID() const;
-	int get_cpuID() const;
-	int testVar = 1;
+	Kernels();
+	int get_gpuID() const {
+		return gpuID;
+	};
+	int get_cpuID() const {
+		return cpuID;
+	};
+
+	int get_threadsToLaunchForVertices() const {
+		return threadsToLaunchForVertices;
+	}
+	int get_blocksToLaunchForVertices() const {
+		return blocksToLaunchForVertices;
+	}
+
+	void set_kernelThreadsAndBlocks(int sceneVertexCount);
 };
 
 static Kernels k;

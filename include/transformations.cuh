@@ -25,6 +25,7 @@ private:
 	// Matrix sizes
 	const size_t matrixByteSize = 16 * sizeof(float);
 	size_t expandedMatrixByteSize;
+	size_t vertexCoCount;
 
 	// Single matrix instance (expand for cublas by implementation)
 	float *worldToCameraMatrix = (float *) malloc(matrixByteSize);
@@ -33,7 +34,7 @@ private:
 	// Converted vertices
 	float *cameraVertices;
 	float *perspectiveVertices;
-	float *screenVertices;
+	float *screenCoordinates;
 public:
 	Transformations() {
 		cublasCreate(&handle);
@@ -51,6 +52,8 @@ public:
 
 	void convertToPerspectiveSpace(const int vertexCount);
 
+	void convertToScreenSpace(const int vertexCount, float screenWidth, float screenHeight);
+
 	void cleanup() {
 		free(worldToCameraMatrix);
 		free(perspectiveMatrix);
@@ -61,10 +64,5 @@ public:
 		cublasDestroy(handle);
 	}
 };
-
-//// SECTION: Manual kernels and functions
-__global__ void
-convertToScreenSpace(float *input, const int vertexCount, float *output, float screenWidth, float screenHeight);
-__device__ unsigned int sceneToLinearGPU(unsigned int vertex, int coordinate, int dim);
 
 #endif //ERPT_RENDER_ENGINE_TRANSFORMATIONS_CUH

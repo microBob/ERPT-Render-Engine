@@ -3,10 +3,12 @@
 //
 #include "../include/kernels.cuh"
 
-int Kernels::get_gpuID() const {
-	return gpuID;
+Kernels::Kernels() { // NOLINT(cppcoreguidelines-pro-type-member-init)
+	cudaGetDeviceProperties(&prop, gpuID);
 }
 
-int Kernels::get_cpuID() const {
-	return cpuID;
+void Kernels::set_kernelThreadsAndBlocks(int sceneVertexCount) {
+	threadsToLaunchForVertices = std::min(prop.maxThreadsPerBlock, (int) sceneVertexCount);
+	blocksToLaunchForVertices = min(prop.maxGridSize[0],
+	                                1 + ((int) sceneVertexCount / prop.maxThreadsPerBlock));
 }

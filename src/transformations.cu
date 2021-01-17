@@ -3,7 +3,41 @@
 //
 #include "../include/transformations.cuh"
 
+//// SECTION: Manual kernels and functions
+__device__ unsigned int sceneToLinearGPU(unsigned int vertex, int coordinate, int dim) {
+	return vertex * dim + coordinate;
+}
 
+__global__ void
+convertToScreenSpaceKernel(float *input, const int vertexCount, float *output, float screenWidth, float screenHeight) {
+	unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	unsigned int increment = blockDim.x * gridDim.x;
+
+	while (tid < vertexCount) {
+		// Skip if point is outside of z-cull space
+		if (abs(input[sceneToLinearGPU(tid, 2, 0)]) > 1) {
+			tid += increment;
+			continue;
+		}
+		// Skip if point will cause divide by 0
+		if (input[sceneToLinearGPU(tid, 3, 0)] == 0) {
+			tid += increment;
+			continue;
+		}
+
+		// Calculate final x and y
+		output[sceneToLinearGPU(tid, 0, 2)] =
+			input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenWidth / 2.0f;
+		output[sceneToLinearGPU(tid, 1, 2)] =
+			input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenHeight / 2.0f;
+
+		// Increment tid
+		tid += increment;
+	}
+}
+
+
+//// SECTION: Transformations implementation
 float *Transformations::get_worldToCameraMatrix() {
 	return worldToCameraMatrix;
 }
@@ -59,8 +93,8 @@ void Transformations::convertVerticesToCameraSpace(float *vertices, const int ve
 	cudaMallocManaged(&expandedWorldToCameraMatrix, expandedMatrixByteSize);
 	cudaMemPrefetchAsync(expandedWorldToCameraMatrix, expandedMatrixByteSize, k.get_cpuID());
 	// Copy
-	for (int i = 0; i < vertexCount; i += 16) {
-		copy(worldToCameraMatrix, worldToCameraMatrix + 16, expandedWorldToCameraMatrix + i);
+	for (int i = 0; i < vertexCount; ++i) {
+		copy(worldToCameraMatrix, worldToCameraMatrix + 16, expandedWorldToCameraMatrix + i * 16);
 	}
 	// Switch to GPU
 	cudaMemAdvise(expandedWorldToCameraMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetPreferredLocation,
@@ -70,9 +104,10 @@ void Transformations::convertVerticesToCameraSpace(float *vertices, const int ve
 	cudaMemPrefetchAsync(expandedWorldToCameraMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
 
 	/// Initialize cameraVertices
-	cudaMallocManaged(&cameraVertices, vertexCount * sizeof(float));
-	cudaMemAdvise(cameraVertices, vertexCount * sizeof(float), cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(cameraVertices, vertexCount * sizeof(float), k.get_gpuID());
+	vertexCoCount = vertexCount * 4 * sizeof(float);
+	cudaMallocManaged(&cameraVertices, vertexCoCount);
+	cudaMemAdvise(cameraVertices, vertexCoCount, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(cameraVertices, vertexCoCount, k.get_gpuID());
 
 	/// cuBLAS
 	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha, expandedWorldToCameraMatrix,
@@ -81,18 +116,18 @@ void Transformations::convertVerticesToCameraSpace(float *vertices, const int ve
 	assert(status == CUBLAS_STATUS_SUCCESS);
 
 	// Cleanup
-	cudaFree(expandedWorldToCameraMatrix);
+//	cudaFree(expandedWorldToCameraMatrix);
 }
 
 void Transformations::convertToPerspectiveSpace(const int vertexCount) {
 	/// Expand perspectiveMatrix
 	// Define and malloc expanded matrix
 	float *expandedPerspectiveMatrix;
-	cudaMallocManaged(&expandedPerspectiveMatrix, expandedMatrixByteSize);
+	auto stat = cudaMallocManaged(&expandedPerspectiveMatrix, expandedMatrixByteSize);
 	cudaMemPrefetchAsync(expandedPerspectiveMatrix, expandedMatrixByteSize, k.get_cpuID());
 	// Copy
-	for (int i = 0; i < vertexCount; i += 16) {
-		copy(perspectiveMatrix, perspectiveMatrix + 16, expandedPerspectiveMatrix + i);
+	for (int i = 0; i < vertexCount; ++i) {
+		copy(perspectiveMatrix, perspectiveMatrix + 16, expandedPerspectiveMatrix + i * 16);
 	}
 	// Switch to GPU
 	cudaMemAdvise(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetPreferredLocation,
@@ -102,9 +137,9 @@ void Transformations::convertToPerspectiveSpace(const int vertexCount) {
 	cudaMemPrefetchAsync(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
 
 	/// Initialize perspectiveVertices
-	cudaMallocManaged(&perspectiveVertices, vertexCount * sizeof(float));
-	cudaMemAdvise(perspectiveVertices, vertexCount * sizeof(float), cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(perspectiveVertices, vertexCount * sizeof(float), k.get_gpuID());
+	cudaMallocManaged(&perspectiveVertices, vertexCoCount);
+	cudaMemAdvise(perspectiveVertices, vertexCoCount, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(perspectiveVertices, vertexCoCount, k.get_gpuID());
 
 	/// cuBLAS
 	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha, expandedPerspectiveMatrix,
@@ -114,36 +149,19 @@ void Transformations::convertToPerspectiveSpace(const int vertexCount) {
 
 	// Cleanup
 	cudaFree(expandedPerspectiveMatrix);
+	cudaFree(cameraVertices);
 }
 
-__global__ void
-convertToScreenSpace(float *input, const int vertexCount, float *output, float screenWidth, float screenHeight) {
-	unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
-	unsigned int increment = blockDim.x * gridDim.x;
+void Transformations::convertToScreenSpace(const int vertexCount, float screenWidth, float screenHeight) {
+	// Define and malloc screenCoordinates
+	cudaMallocManaged(&screenCoordinates, 2 * vertexCount * sizeof(float));
+	cudaMemPrefetchAsync(screenCoordinates, 2 * vertexCount * sizeof(float), k.get_gpuID());
 
-	while (tid < vertexCount) {
-		// Skip if point is outside of z-cull space
-		if (abs(input[sceneToLinearGPU(tid, 2, 0)]) > 1) {
-			tid += increment;
-			continue;
-		}
-		// Skip if point will cause divide by 0
-		if (input[sceneToLinearGPU(tid, 3, 0)] == 0) {
-			tid += increment;
-			continue;
-		}
+	// Run kernel
+	convertToScreenSpaceKernel<<<k.get_threadsToLaunchForVertices(), k.get_blocksToLaunchForVertices()>>>(
+		perspectiveVertices, vertexCount, screenCoordinates, screenWidth, screenHeight);
+	cudaDeviceSynchronize();
 
-		// Calculate final x and y
-		output[sceneToLinearGPU(tid, 0, 2)] =
-			input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenWidth / 2.0f;
-		output[sceneToLinearGPU(tid, 1, 2)] =
-			input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenHeight / 2.0f;
-
-		// Increment tid
-		tid += increment;
-	}
-}
-
-__device__ unsigned int sceneToLinearGPU(unsigned int vertex, int coordinate, int dim) {
-	return vertex * dim + coordinate;
+	// Cleanup
+	cudaFree(perspectiveVertices);
 }

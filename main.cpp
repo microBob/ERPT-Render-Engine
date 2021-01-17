@@ -15,6 +15,8 @@ int main() {
 	float *sceneVertices;
 	size_t sceneVerticesByteSize;
 
+	float screenWidth, screenHeight;
+
 
 	//// SECTION: Connect to addon and read in data
 	if (!com.ConnectSocket()) {
@@ -32,7 +34,10 @@ int main() {
 	// Extract resolution
 	auto resolutionData = renderDataDOM.FindMember(RESOLUTION)->value.GetArray();
 
-	size_t pixDataSize = resolutionData[0].GetFloat() * resolutionData[1].GetFloat() * 4 *
+	screenWidth = resolutionData[0].GetFloat();
+	screenHeight = resolutionData[1].GetFloat();
+
+	size_t pixDataSize = screenWidth * screenHeight * 4 *
 	                     sizeof(float); // Assume 1080 in case of read failure
 
 	cudaMallocManaged(&pixData, pixDataSize);
@@ -69,7 +74,7 @@ int main() {
 	}
 
 	// Malloc vertices data
-	sceneVerticesByteSize = 4 * rawVertices.size() * sizeof(float);
+	sceneVerticesByteSize = rawVertices.size() * sizeof(float);
 	cudaMallocManaged(&sceneVertices, sceneVerticesByteSize);
 	// Transfer to CPU
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_cpuID());
@@ -81,9 +86,18 @@ int main() {
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_gpuID());
 
 	/// Convert vertices to camera space
-	transformations.convertVerticesToCameraSpace(sceneVertices, (int) (sceneVerticesByteSize / sizeof(float)));
+	int sceneVertexCount = (int) rawVertices.size() / 4;
+	transformations.convertVerticesToCameraSpace(sceneVertices, sceneVertexCount);
 
+	/// Convert vertices to perspective space
+	auto cameraClipArray = cameraDataDOM.FindMember(CLIP)->value.GetArray();
+	transformations.set_perspectiveMatrix(screenWidth, screenHeight, cameraDataDOM.FindMember(FOV)->value.GetFloat(),
+	                                      cameraClipArray[0].GetFloat(), cameraClipArray[1].GetFloat());
+	transformations.convertToPerspectiveSpace(sceneVertexCount);
 
+	/// Convert to screen space
+	k.set_kernelThreadsAndBlocks(sceneVertexCount);
+	transformations.convertToScreenSpace(sceneVertexCount, screenWidth, screenHeight);
 
 	//// SECTION: Convert and send data
 	com.ConvertAndSend(pixData, pixDataSize);
