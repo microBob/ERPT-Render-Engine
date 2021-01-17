@@ -25,14 +25,11 @@ private:
 	// Matrix sizes
 	const size_t matrixByteSize = 16 * sizeof(float);
 	size_t expandedMatrixByteSize;
-	size_t vertexCoCount;
 
 	// Single matrix instance (expand for cublas by implementation)
-	float *worldToCameraMatrix = (float *) malloc(matrixByteSize);
-	float *perspectiveMatrix = (float *) malloc(matrixByteSize);
+	float *worldToPerspectiveMatrix = (float *) malloc(matrixByteSize);
 
 	// Converted vertices
-	float *cameraVertices;
 	float *perspectiveVertices;
 	float *screenCoordinates;
 public:
@@ -40,25 +37,16 @@ public:
 		cublasCreate(&handle);
 	}
 
-	float *get_worldToCameraMatrix();
+	void set_worldToPerspectiveMatrix(float x, float y, float z, float degX, float degY, float degZ, float fov,
+	                                  float screenWidth, float screenHeight, float zNear, float zFar);
 
-	void set_worldToCameraMatrix(float x, float y, float z, float degX, float degY, float degZ);
+	void convertWorldToPerspectiveSpace(float *vertices, const int vertexCount);
 
-	void set_perspectiveMatrix(float screenWidth, float screenHeight, float fovRadians, float zFar, float zNear);
-
-	float *get_perspectiveMatrix();
-
-	void convertVerticesToCameraSpace(float *vertices, const int vertexCount);
-
-	void convertToPerspectiveSpace(const int vertexCount);
-
-	void convertToScreenSpace(const int vertexCount, float screenWidth, float screenHeight);
+	void convertPerspectiveToScreenSpace(const int vertexCount, float screenWidth, float screenHeight);
 
 	void cleanup() {
-		free(worldToCameraMatrix);
-		free(perspectiveMatrix);
+		free(worldToPerspectiveMatrix);
 
-		cudaFree(cameraVertices);
 		cudaFree(perspectiveVertices);
 
 		cublasDestroy(handle);

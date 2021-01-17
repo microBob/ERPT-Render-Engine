@@ -54,9 +54,10 @@ int main() {
 	// Verify rotation data exists
 	auto cameraRotation = cameraDataDOM.FindMember(ROTATION)->value.GetArray();
 	// Once all Verified, set translation matrix
-	transformations.set_worldToCameraMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
-	                                        cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
-	                                        cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat());
+	transformations.set_worldToPerspectiveMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
+	                                             cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
+	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(), 0, 0, 0, 0,
+	                                             0);
 
 	/// Decompose mesh data into vertices
 	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetArray();
@@ -87,17 +88,8 @@ int main() {
 
 	/// Convert vertices to camera space
 	int sceneVertexCount = (int) rawVertices.size() / 4;
-	transformations.convertVerticesToCameraSpace(sceneVertices, sceneVertexCount);
-
-	/// Convert vertices to perspective space
-	auto cameraClipArray = cameraDataDOM.FindMember(CLIP)->value.GetArray();
-	transformations.set_perspectiveMatrix(screenWidth, screenHeight, cameraDataDOM.FindMember(FOV)->value.GetFloat(),
-	                                      cameraClipArray[0].GetFloat(), cameraClipArray[1].GetFloat());
-	transformations.convertToPerspectiveSpace(sceneVertexCount);
-
-	/// Convert to screen space
 	k.set_kernelThreadsAndBlocks(sceneVertexCount);
-	transformations.convertToScreenSpace(sceneVertexCount, screenWidth, screenHeight);
+
 
 	//// SECTION: Convert and send data
 	com.ConvertAndSend(pixData, pixDataSize);

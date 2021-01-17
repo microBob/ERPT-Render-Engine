@@ -38,54 +38,53 @@ convertToScreenSpaceKernel(float *input, const int vertexCount, float *output, f
 
 
 //// SECTION: Transformations implementation
-float *Transformations::get_worldToCameraMatrix() {
-	return worldToCameraMatrix;
-}
+void
+Transformations::set_worldToPerspectiveMatrix(float x, float y, float z, float degX, float degY, float degZ, float fov,
+                                              float screenWidth, float screenHeight, float zNear, float zFar) {
+	// Convert degrees to radians (negate already built into matrix)
+	float radX = degX * (float) M_PI / 180.0f;
+	float radY = degY * (float) M_PI / 180.0f;
+	float radZ = degZ * (float) M_PI / 180.0f;
 
-void Transformations::set_worldToCameraMatrix(float x, float y, float z, float degX, float degY, float degZ) {
-	// Convert degrees to radians and negate
-	float radX = -degX * (float) M_PI / 180.0f;
-	float radY = -degY * (float) M_PI / 180.0f;
-	float radZ = -degZ * (float) M_PI / 180.0f;
+	// Common values
+	float tanFov = tan(fov / 2);
+	float wTanFov = screenWidth * tanFov;
+	float nearFar = zNear - zFar;
+	float comExpr1 = (-cos(radX) * sin(radZ) + cos(radZ) * sin(radX) * sin(radY)) / tanFov;
+	float comExpr2 = (-2 * sin(radX) * sin(radZ) - 2 * cos(radX) * cos(radZ) * sin(radY)) / nearFar;
+	float comExpr3 = -sin(radX) * sin(radZ) - cos(radX) * cos(radZ) * sin(radY);
+	float comExpr4 = (cos(radX) * cos(radZ) + sin(radX) * sin(radY) * sin(radZ)) / tanFov;
+	float comExpr5 = (2 * cos(radZ) * sin(radX) - 2 * cos(radX) * sin(radY) * sin(radZ)) / nearFar;
+	float comExpr6 = cos(radZ) * sin(radX) - cos(radX) * sin(radY) * sin(radZ);
+	float comExpr7 = cos(radY) * sin(radX) / tanFov;
 
 	/// Copy in matrix
 	// 1
-	worldToCameraMatrix[0] = cos(radY) * cos(radZ);
-	worldToCameraMatrix[1] = sin(radX) * sin(radY) * cos(radZ) + cos(radX) * sin(radZ);
-	worldToCameraMatrix[2] = sin(radX) * sin(radZ) - cos(radX) * sin(radY) * cos(radZ);
+	worldToPerspectiveMatrix[0] = screenHeight * cos(radY) * cos(radZ) / wTanFov;
+	worldToPerspectiveMatrix[1] = comExpr1;
+	worldToPerspectiveMatrix[2] = comExpr2;
+	worldToPerspectiveMatrix[3] = comExpr3;
 	// 2
-	worldToCameraMatrix[4] = -cos(radY) * sin(radZ);
-	worldToCameraMatrix[5] = cos(radX) * cos(radZ) - sin(radX) * sin(radY) * sin(radZ);
-	worldToCameraMatrix[6] = cos(radX) * sin(radY) * sin(radZ) + sin(radX) * cos(radZ);
+	worldToPerspectiveMatrix[4] = -screenHeight * cos(radY) * sin(radZ) / wTanFov;
+	worldToPerspectiveMatrix[5] = comExpr4;
+	worldToPerspectiveMatrix[6] = comExpr5;
+	worldToPerspectiveMatrix[7] = comExpr6;
 	// 3
-	worldToCameraMatrix[8] = sin(radY);
-	worldToCameraMatrix[9] = -sin(radX) * cos(radY);
-	worldToCameraMatrix[10] = cos(radX) * cos(radY);
+	worldToPerspectiveMatrix[8] = -screenHeight * sin(radY) / wTanFov;
+	worldToPerspectiveMatrix[9] = comExpr7;
+	worldToPerspectiveMatrix[10] = -2 * cos(radX) * cos(radY) / nearFar;
+	worldToPerspectiveMatrix[11] = -cos(radX) * cos(radY);
 	// 4
-	worldToCameraMatrix[12] = y * cos(radY) * sin(radZ) - x * cos(radY) * cos(radZ) - z * sin(radY);
-	worldToCameraMatrix[13] =
-		z * sin(radX) * cos(radY) - x * (sin(radX) * sin(radY) * cos(radZ) + cos(radX) * sin(radZ)) -
-		y * (cos(radX) * cos(radZ) - sin(radX) * sin(radY) * sin(radZ));
-	worldToCameraMatrix[14] = -x * (sin(radX) * sin(radZ) - cos(radX) * sin(radY) * cos(radZ)) -
-	                          y * (cos(radX) * sin(radY) * sin(radZ) + sin(radX) * cos(radZ)) -
-	                          z * cos(radX) * cos(radY);
-	worldToCameraMatrix[15] = 1.0f;
+	worldToPerspectiveMatrix[12] =
+		(-cos(radZ) * screenHeight * x * cos(radY) - sin(radZ) * screenHeight * y * cos(radY) +
+		 screenHeight * z * sin(radY)) / wTanFov;
+	worldToPerspectiveMatrix[13] = -x * comExpr1 - y * comExpr2 - z * comExpr7;
+	worldToPerspectiveMatrix[14] =
+		-x * comExpr2 - y * comExpr5 + (-zNear + zFar) / (zNear + zFar) + 2 * cos(radX) * cos(radY) / -nearFar;
+	worldToPerspectiveMatrix[15] = -x * comExpr3 - y * comExpr6 + z * cos(radX) * cos(radY);
 }
 
-void Transformations::set_perspectiveMatrix(float screenWidth, float screenHeight, float fovRadians, float zFar,
-                                            float zNear) {
-	perspectiveMatrix[0] = screenWidth / screenHeight / tan(fovRadians / 2);
-	perspectiveMatrix[5] = 1.0f / tan(fovRadians / 2);
-	perspectiveMatrix[10] = 2.0f / (zFar - zNear);
-	perspectiveMatrix[11] = -1.0f;
-	perspectiveMatrix[14] = -(zNear - zFar) / (zFar + zNear);
-}
-
-float *Transformations::get_perspectiveMatrix() {
-	return perspectiveMatrix;
-}
-
-void Transformations::convertVerticesToCameraSpace(float *vertices, const int vertexCount) {
+void Transformations::convertWorldToPerspectiveSpace(float *vertices, const int vertexCount) {
 	/// Expand worldToCameraMatrix
 	// Define and malloc expanded matrix
 	float *expandedWorldToCameraMatrix;
@@ -119,40 +118,7 @@ void Transformations::convertVerticesToCameraSpace(float *vertices, const int ve
 //	cudaFree(expandedWorldToCameraMatrix);
 }
 
-void Transformations::convertToPerspectiveSpace(const int vertexCount) {
-	/// Expand perspectiveMatrix
-	// Define and malloc expanded matrix
-	float *expandedPerspectiveMatrix;
-	auto stat = cudaMallocManaged(&expandedPerspectiveMatrix, expandedMatrixByteSize);
-	cudaMemPrefetchAsync(expandedPerspectiveMatrix, expandedMatrixByteSize, k.get_cpuID());
-	// Copy
-	for (int i = 0; i < vertexCount; ++i) {
-		copy(perspectiveMatrix, perspectiveMatrix + 16, expandedPerspectiveMatrix + i * 16);
-	}
-	// Switch to GPU
-	cudaMemAdvise(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetPreferredLocation,
-	              k.get_gpuID());
-	cudaMemAdvise(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetReadMostly,
-	              k.get_gpuID());
-	cudaMemPrefetchAsync(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
-
-	/// Initialize perspectiveVertices
-	cudaMallocManaged(&perspectiveVertices, vertexCoCount);
-	cudaMemAdvise(perspectiveVertices, vertexCoCount, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(perspectiveVertices, vertexCoCount, k.get_gpuID());
-
-	/// cuBLAS
-	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha, expandedPerspectiveMatrix,
-	                                   4, 16, cameraVertices, 4, 4, &beta, perspectiveVertices, 4, 4, vertexCount);
-	cudaDeviceSynchronize();
-	assert(status == CUBLAS_STATUS_SUCCESS);
-
-	// Cleanup
-	cudaFree(expandedPerspectiveMatrix);
-	cudaFree(cameraVertices);
-}
-
-void Transformations::convertToScreenSpace(const int vertexCount, float screenWidth, float screenHeight) {
+void Transformations::convertPerspectiveToScreenSpace(const int vertexCount, float screenWidth, float screenHeight) {
 	// Define and malloc screenCoordinates
 	cudaMallocManaged(&screenCoordinates, 2 * vertexCount * sizeof(float));
 	cudaMemPrefetchAsync(screenCoordinates, 2 * vertexCount * sizeof(float), k.get_gpuID());
