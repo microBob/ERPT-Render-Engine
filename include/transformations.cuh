@@ -32,6 +32,7 @@ private:
 
 	// Converted vertices
 	float *cameraVertices;
+	float *perspectiveVertices;
 	float *screenVertices;
 public:
 	Transformations() {
@@ -48,17 +49,22 @@ public:
 
 	void convertVerticesToCameraSpace(float *vertices, const int vertexCount);
 
-	void convertToScreenSpace(const int vertexCount);
+	void convertToPerspectiveSpace(const int vertexCount);
 
 	void cleanup() {
 		free(worldToCameraMatrix);
 		free(perspectiveMatrix);
 
 		cudaFree(cameraVertices);
-		cudaFree(screenVertices);
+		cudaFree(perspectiveVertices);
 
 		cublasDestroy(handle);
 	}
 };
+
+//// SECTION: Manual kernels and functions
+__global__ void
+convertToScreenSpace(float *input, const int vertexCount, float *output, float screenWidth, float screenHeight);
+__device__ unsigned int sceneToLinearGPU(unsigned int vertex, int coordinate, int dim);
 
 #endif //ERPT_RENDER_ENGINE_TRANSFORMATIONS_CUH

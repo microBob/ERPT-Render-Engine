@@ -84,7 +84,7 @@ void Transformations::convertVerticesToCameraSpace(float *vertices, const int ve
 	cudaFree(expandedWorldToCameraMatrix);
 }
 
-void Transformations::convertToScreenSpace(const int vertexCount) {
+void Transformations::convertToPerspectiveSpace(const int vertexCount) {
 	/// Expand perspectiveMatrix
 	// Define and malloc expanded matrix
 	float *expandedPerspectiveMatrix;
@@ -101,17 +101,49 @@ void Transformations::convertToScreenSpace(const int vertexCount) {
 	              k.get_gpuID());
 	cudaMemPrefetchAsync(expandedPerspectiveMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
 
-	/// Initialize screenVertices
-	cudaMallocManaged(&screenVertices, vertexCount * sizeof(float));
-	cudaMemAdvise(screenVertices, vertexCount * sizeof(float), cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(screenVertices, vertexCount * sizeof(float), k.get_gpuID());
+	/// Initialize perspectiveVertices
+	cudaMallocManaged(&perspectiveVertices, vertexCount * sizeof(float));
+	cudaMemAdvise(perspectiveVertices, vertexCount * sizeof(float), cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(perspectiveVertices, vertexCount * sizeof(float), k.get_gpuID());
 
 	/// cuBLAS
 	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha, expandedPerspectiveMatrix,
-	                                   4, 16, cameraVertices, 4, 4, &beta, screenVertices, 4, 4, vertexCount);
+	                                   4, 16, cameraVertices, 4, 4, &beta, perspectiveVertices, 4, 4, vertexCount);
 	cudaDeviceSynchronize();
 	assert(status == CUBLAS_STATUS_SUCCESS);
 
 	// Cleanup
 	cudaFree(expandedPerspectiveMatrix);
+}
+
+__global__ void
+convertToScreenSpace(float *input, const int vertexCount, float *output, float screenWidth, float screenHeight) {
+	unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
+	unsigned int increment = blockDim.x * gridDim.x;
+
+	while (tid < vertexCount) {
+		// Skip if point is outside of z-cull space
+		if (abs(input[sceneToLinearGPU(tid, 2, 0)]) > 1) {
+			tid += increment;
+			continue;
+		}
+		// Skip if point will cause divide by 0
+		if (input[sceneToLinearGPU(tid, 3, 0)] == 0) {
+			tid += increment;
+			continue;
+		}
+
+		// Calculate final x and y
+		output[sceneToLinearGPU(tid, 0, 2)] =
+			input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenWidth / 2.0f;
+		output[sceneToLinearGPU(tid, 1, 2)] =
+			input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenHeight / 2.0f;
+
+		// Increment tid
+		tid += increment;
+	}
+}
+
+__device__ unsigned int sceneToLinearGPU(unsigned int vertex, int coordinate, int dim) {
+	return vertex * dim + coordinate;
 }
