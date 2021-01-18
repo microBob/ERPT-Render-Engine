@@ -82,10 +82,6 @@ Transformations::set_worldToPerspectiveMatrix(float x, float y, float z, float d
 	worldToPerspectiveMatrix[14] =
 		-x * comExpr2 - y * comExpr5 + (-zNear + zFar) / (zNear + zFar) + 2 * cos(radX) * cos(radY) / -nearFar;
 	worldToPerspectiveMatrix[15] = -x * comExpr3 - y * comExpr6 + z * cos(radX) * cos(radY);
-
-	for (int i = 0; i < 16; ++i) {
-		cout << worldToPerspectiveMatrix[i] << endl;
-	}
 }
 
 void Transformations::convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output) {
@@ -93,19 +89,18 @@ void Transformations::convertWorldToPerspectiveSpace(float *input, const int ver
 	// Define and malloc expanded matrix
 	float *expandedWorldToPerspectiveMatrix;
 	size_t expandedMatrixByteSize = vertexCount * matrixByteSize;
-	cudaMallocManaged(&expandedWorldToPerspectiveMatrix, expandedMatrixByteSize);
-	cudaMemPrefetchAsync(expandedWorldToPerspectiveMatrix, expandedMatrixByteSize, k.get_cpuID());
-	// Copy
+	auto cs = cudaMallocManaged(&expandedWorldToPerspectiveMatrix, expandedMatrixByteSize);
+	auto cs2 = cudaMemPrefetchAsync(expandedWorldToPerspectiveMatrix, expandedMatrixByteSize, k.get_cpuID());
+	// Copy (expand)
 	for (int i = 0; i < vertexCount; ++i) {
 		copy(worldToPerspectiveMatrix, worldToPerspectiveMatrix + 16, expandedWorldToPerspectiveMatrix + i * 16);
 	}
 	// Switch to GPU
-	cudaMemAdvise(expandedWorldToPerspectiveMatrix, vertexCount * expandedMatrixByteSize,
-	              cudaMemAdviseSetPreferredLocation,
-	              k.get_gpuID());
-	cudaMemAdvise(expandedWorldToPerspectiveMatrix, vertexCount * expandedMatrixByteSize, cudaMemAdviseSetReadMostly,
-	              k.get_gpuID());
-	cudaMemPrefetchAsync(expandedWorldToPerspectiveMatrix, vertexCount * expandedMatrixByteSize, k.get_gpuID());
+	auto cs3 = cudaMemAdvise(expandedWorldToPerspectiveMatrix, expandedMatrixByteSize,
+	                         cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	auto cs4 = cudaMemAdvise(expandedWorldToPerspectiveMatrix, expandedMatrixByteSize, cudaMemAdviseSetReadMostly,
+	                         k.get_gpuID());
+	auto cs5 = cudaMemPrefetchAsync(expandedWorldToPerspectiveMatrix, expandedMatrixByteSize, k.get_gpuID());
 
 	/// cuBLAS
 	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha,
