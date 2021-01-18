@@ -53,15 +53,16 @@ int main() {
 	/// Create camera matrix
 	// Get camera data and verify existence
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
-	// Verify location data exists
 	auto cameraLocation = cameraDataDOM.FindMember(LOCATION)->value.GetArray();
-	// Verify rotation data exists
 	auto cameraRotation = cameraDataDOM.FindMember(ROTATION)->value.GetArray();
+	auto cameraFov = cameraDataDOM.FindMember(FOV)->value.GetFloat();
+	auto cameraClipping = cameraDataDOM.FindMember(CLIP)->value.GetArray();
 	// Once all Verified, set translation matrix
 	transformations.set_worldToPerspectiveMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
 	                                             cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
-	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(), 0, 0, 0, 0,
-	                                             0);
+	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(), cameraFov,
+	                                             screenWidth, screenHeight, cameraClipping[0].GetFloat(),
+	                                             cameraClipping[1].GetFloat());
 
 	/// Decompose mesh data into vertices
 	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetArray();

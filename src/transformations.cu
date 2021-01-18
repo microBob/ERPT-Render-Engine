@@ -7,6 +7,7 @@
 __device__ unsigned int sceneToLinearGPU(unsigned int vertex, int coordinate, int dim) {
 	return vertex * dim + coordinate;
 }
+
 __global__ void
 convertToScreenSpaceKernel(float *input, const int vertexCount, float screenWidth, float screenHeight, float *output) {
 	unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -81,6 +82,10 @@ Transformations::set_worldToPerspectiveMatrix(float x, float y, float z, float d
 	worldToPerspectiveMatrix[14] =
 		-x * comExpr2 - y * comExpr5 + (-zNear + zFar) / (zNear + zFar) + 2 * cos(radX) * cos(radY) / -nearFar;
 	worldToPerspectiveMatrix[15] = -x * comExpr3 - y * comExpr6 + z * cos(radX) * cos(radY);
+
+	for (int i = 0; i < 16; ++i) {
+		cout << worldToPerspectiveMatrix[i] << endl;
+	}
 }
 
 void Transformations::convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output) {
@@ -106,7 +111,7 @@ void Transformations::convertWorldToPerspectiveSpace(float *input, const int ver
 	status = cublasSgemmStridedBatched(handle, CUBLAS_OP_N, CUBLAS_OP_N, 4, 1, 4, &alpha,
 	                                   expandedWorldToPerspectiveMatrix,
 	                                   4, 16, input, 4, 4, &beta, output, 4, 4, vertexCount);
-	cudaDeviceSynchronize();
+	auto s = cudaDeviceSynchronize();
 	assert(status == CUBLAS_STATUS_SUCCESS);
 
 	// Cleanup
