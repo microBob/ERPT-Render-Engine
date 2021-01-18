@@ -84,8 +84,8 @@ int main() {
 	cudaMallocManaged(&sceneVertices, sceneVerticesByteSize);
 	// Transfer to CPU
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_cpuID());
-	// Set values
-	sceneVertices = &rawVertices[0];
+	// Convert values from vector to array
+	copy(rawVertices.begin(), rawVertices.end(), sceneVertices);
 	// Switch to GPU
 	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
 	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
@@ -105,7 +105,7 @@ int main() {
 	float *screenCoordinates;
 	size_t screenCoordinatesByteSize = 2 * sceneVertexCount * sizeof(float);
 	// Initialize output
-	auto status = cudaMallocManaged(&screenCoordinates, screenCoordinatesByteSize);
+	cudaMallocManaged(&screenCoordinates, screenCoordinatesByteSize);
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_gpuID());
 	// MemAdvise input
