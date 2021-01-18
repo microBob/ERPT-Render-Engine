@@ -7,7 +7,6 @@
 __device__ unsigned int sceneToLinearGPU(unsigned int vertex, int coordinate, int dim) {
 	return vertex * dim + coordinate;
 }
-
 __global__ void
 convertToScreenSpaceKernel(float *input, const int vertexCount, float screenWidth, float screenHeight, float *output) {
 	unsigned int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -126,7 +125,7 @@ void Transformations::convertPerspectiveToScreenSpace(float *input, const int ve
 	float halfHeight = screenHeight / 2;
 
 	// Run kernel
-	convertToScreenSpaceKernel<<<k.get_threadsToLaunchForVertices(), k.get_blocksToLaunchForVertices()>>>(
+	convertToScreenSpaceKernel<<<k.get_blocksToLaunchForVertices(), k.get_threadsToLaunchForVertices()>>>(
 		input, vertexCount, halfWidth, halfHeight, output);
 	cudaDeviceSynchronize();
 }

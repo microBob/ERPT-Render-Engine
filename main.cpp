@@ -3,6 +3,10 @@
 #include "include/communication.h"
 #include "include/transformations.cuh"
 
+unsigned int cartesianToLinear(float x, float y, float screenWidth, float screenHeight) {
+	return (unsigned int) ((y + screenHeight / 2) * screenWidth + (x + screenWidth / 2));
+}
+
 int main() {
 	//// SECTION: Variables and instances
 	/// Class instances
@@ -42,10 +46,10 @@ int main() {
 
 	cudaMallocManaged(&pixData, pixDataSize);
 	cudaMemPrefetchAsync(pixData, pixDataSize, k.get_cpuID());
-	fill_n(pixData, pixDataSize / sizeof(float), 1.0f);
+	fill_n(pixData, pixDataSize / sizeof(float), 0); // Fill with black screen
 
 
-	//// SECTION: Convert to Camera space
+	//// SECTION: Convert Data to screen space
 	/// Create camera matrix
 	// Get camera data and verify existence
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
@@ -98,10 +102,11 @@ int main() {
 
 	/// Convert perspective to screen coordinates
 	float *screenCoordinates;
+	size_t screenCoordinatesByteSize = 2 * sceneVertexCount * sizeof(float);
 	// Initialize output
-	cudaMallocManaged(&screenCoordinates, sceneVerticesByteSize / 2);
-	cudaMemAdvise(screenCoordinates, sceneVerticesByteSize / 2, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(screenCoordinates, sceneVerticesByteSize / 2, k.get_gpuID());
+	auto status = cudaMallocManaged(&screenCoordinates, screenCoordinatesByteSize);
+	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_gpuID());
 	// MemAdvise input
 	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
@@ -110,6 +115,20 @@ int main() {
 	transformations.convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
 	                                                screenCoordinates);
 	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
+
+	//// SECTION: Draw point cloud
+	/// Switch screenCoordinates to CPU
+	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_cpuID());
+	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetReadMostly, k.get_cpuID());
+	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
+	for (int i = 0; i < sceneVertexCount; ++i) {
+		unsigned int screenCoordinate = cartesianToLinear(screenCoordinates[i * 2], screenCoordinates[i * 2 + 1],
+		                                                  screenWidth, screenHeight);
+		pixData[screenCoordinate] = 1.0f;
+		pixData[screenCoordinate + 1] = 1.0f;
+		pixData[screenCoordinate + 2] = 1.0f;
+		pixData[screenCoordinate + 3] = 1.0f;
+	}
 
 
 	//// SECTION: Convert and send data
