@@ -33,7 +33,7 @@ public:
 		cublasCreate(&handle);
 	}
 
-	void set_worldToPerspectiveMatrix(float x, float y, float z, float degX, float degY, float degZ, float fov,
+	void set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ, float fov,
 	                                  float screenWidth, float screenHeight, float zNear, float zFar);
 
 	void convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output);

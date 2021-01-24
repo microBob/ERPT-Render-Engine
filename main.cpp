@@ -123,6 +123,7 @@ int main() {
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetReadMostly, k.get_cpuID());
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 	for (int i = 0; i < sceneVertexCount; ++i) {
+		cout << screenCoordinates[i * 2] << ", " << screenCoordinates[i * 2 + 1] << endl;
 		unsigned int screenCoordinate = cartesianToLinear(screenCoordinates[i * 2], screenCoordinates[i * 2 + 1],
 		                                                  screenWidth, screenHeight);
 		pixData[screenCoordinate] = 1.0f;

@@ -27,9 +27,9 @@ convertToScreenSpaceKernel(float *input, const int vertexCount, float screenWidt
 
 		// Calculate final x and y
 		output[sceneToLinearGPU(tid, 0, 2)] =
-			input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenWidth;
+			(input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] + 1) * screenWidth;
 		output[sceneToLinearGPU(tid, 1, 2)] =
-			input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] * screenHeight;
+			(input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] + 1) * screenHeight;
 
 		// Increment tid
 		tid += increment;
@@ -39,49 +39,49 @@ convertToScreenSpaceKernel(float *input, const int vertexCount, float screenWidt
 
 //// SECTION: Transformations implementation
 void
-Transformations::set_worldToPerspectiveMatrix(float x, float y, float z, float degX, float degY, float degZ, float fov,
+Transformations::set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ, float fov,
                                               float screenWidth, float screenHeight, float zNear, float zFar) {
-	// Convert degrees to radians (negate already built into matrix)
-	float radX = degX * (float) M_PI / 180.0f;
-	float radY = degY * (float) M_PI / 180.0f;
-	float radZ = degZ * (float) M_PI / 180.0f;
-
 	// Common values
 	float tanFov = tan(fov / 2);
 	float wTanFov = screenWidth * tanFov;
 	float nearFar = zNear - zFar;
-	float comExpr1 = (-cos(radX) * sin(radZ) + cos(radZ) * sin(radX) * sin(radY)) / tanFov;
-	float comExpr2 = (-2 * sin(radX) * sin(radZ) - 2 * cos(radX) * cos(radZ) * sin(radY)) / nearFar;
-	float comExpr3 = -sin(radX) * sin(radZ) - cos(radX) * cos(radZ) * sin(radY);
-	float comExpr4 = (cos(radX) * cos(radZ) + sin(radX) * sin(radY) * sin(radZ)) / tanFov;
-	float comExpr5 = (2 * cos(radZ) * sin(radX) - 2 * cos(radX) * sin(radY) * sin(radZ)) / nearFar;
-	float comExpr6 = cos(radZ) * sin(radX) - cos(radX) * sin(radY) * sin(radZ);
-	float comExpr7 = cos(radY) * sin(radX) / tanFov;
+	float comExpr1 = (-cos(rotX) * sin(rotZ) + cos(rotZ) * sin(rotX) * sin(rotY)) / tanFov;
+	float comExpr2 = (-2 * sin(rotX) * sin(rotZ) - 2 * cos(rotX) * cos(rotZ) * sin(rotY)) / nearFar;
+	float comExpr3 = -sin(rotX) * sin(rotZ) - cos(rotX) * cos(rotZ) * sin(rotY);
+	float comExpr4 = (cos(rotX) * cos(rotZ) + sin(rotX) * sin(rotY) * sin(rotZ)) / tanFov;
+	float comExpr5 = (2 * cos(rotZ) * sin(rotX) - 2 * cos(rotX) * sin(rotY) * sin(rotZ)) / nearFar;
+	float comExpr6 = cos(rotZ) * sin(rotX) - cos(rotX) * sin(rotY) * sin(rotZ);
+	float comExpr7 = cos(rotY) * sin(rotX) / tanFov;
 
 	/// Copy in matrix
 	// 1
-	worldToPerspectiveMatrix[0] = screenHeight * cos(radY) * cos(radZ) / wTanFov;
+	worldToPerspectiveMatrix[0] = screenHeight * cos(rotY) * cos(rotZ) / wTanFov;
 	worldToPerspectiveMatrix[1] = comExpr1;
 	worldToPerspectiveMatrix[2] = comExpr2;
 	worldToPerspectiveMatrix[3] = comExpr3;
 	// 2
-	worldToPerspectiveMatrix[4] = -screenHeight * cos(radY) * sin(radZ) / wTanFov;
+	worldToPerspectiveMatrix[4] = screenHeight * cos(rotY) * sin(rotZ) / wTanFov;
 	worldToPerspectiveMatrix[5] = comExpr4;
 	worldToPerspectiveMatrix[6] = comExpr5;
 	worldToPerspectiveMatrix[7] = comExpr6;
 	// 3
-	worldToPerspectiveMatrix[8] = -screenHeight * sin(radY) / wTanFov;
+	worldToPerspectiveMatrix[8] = -screenHeight * sin(rotY) / wTanFov;
 	worldToPerspectiveMatrix[9] = comExpr7;
-	worldToPerspectiveMatrix[10] = -2 * cos(radX) * cos(radY) / nearFar;
-	worldToPerspectiveMatrix[11] = -cos(radX) * cos(radY);
+	worldToPerspectiveMatrix[10] = -2 * cos(rotX) * cos(rotY) / nearFar;
+	worldToPerspectiveMatrix[11] = -cos(rotX) * cos(rotY);
 	// 4
 	worldToPerspectiveMatrix[12] =
-		(-cos(radZ) * screenHeight * x * cos(radY) - sin(radZ) * screenHeight * y * cos(radY) +
-		 screenHeight * z * sin(radY)) / wTanFov;
-	worldToPerspectiveMatrix[13] = -x * comExpr1 - y * comExpr2 - z * comExpr7;
+		(-cos(rotZ) * screenHeight * locX * cos(rotY) - sin(rotZ) * screenHeight * locY * cos(rotY) +
+		 screenHeight * locZ * sin(rotY)) / wTanFov;
+	worldToPerspectiveMatrix[13] = -locX * comExpr1 - locY * comExpr2 - locZ * comExpr7;
 	worldToPerspectiveMatrix[14] =
-		-x * comExpr2 - y * comExpr5 + (-zNear + zFar) / (zNear + zFar) + 2 * cos(radX) * cos(radY) / -nearFar;
-	worldToPerspectiveMatrix[15] = -x * comExpr3 - y * comExpr6 + z * cos(radX) * cos(radY);
+		-locX * comExpr2 - locY * comExpr5 + (-zNear + zFar) / (zNear + zFar) + 2 * cos(rotX) * cos(rotY) / -nearFar;
+	worldToPerspectiveMatrix[15] = -locX * comExpr3 - locY * comExpr6 + locZ * cos(rotX) * cos(rotY);
+
+	for (int i = 0; i < 16; ++i) {
+		cout << i << ": " << worldToPerspectiveMatrix[i] << endl;
+	}
+	cout << endl << endl;
 }
 
 void Transformations::convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output) {
