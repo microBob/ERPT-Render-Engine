@@ -117,23 +117,46 @@ int main() {
 	cudaMallocManaged(&screenCoordinates, screenCoordinatesByteSize);
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 	fill_n(screenCoordinates, screenCoordinatesByteSize, 0);
-//	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-//	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_gpuID());
+	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_gpuID());
 	// MemAdvise input
 	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
 	// Convert perspective to screen
-//	k.set_kernelThreadsAndBlocks(sceneVertexCount);
-//	Transformations::convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
-//	                                                 screenCoordinates);
+	k.set_kernelThreadsAndBlocks(sceneVertexCount);
 
-	for (int i = 0; i < sceneVertexCount; ++i) {
-		screenCoordinates[i * 3] =
-			(perspectiveVertices[i * 4] / perspectiveVertices[i * 4 + 3] + 1) * screenWidth / 2;
-		screenCoordinates[i * 3 + 1] =
-			(perspectiveVertices[i * 4 + 1] / perspectiveVertices[i * 4 + 3] + 1) * screenHeight / 2;
-		screenCoordinates[i * 3 + 2] = perspectiveVertices[i * 4 + 3];
+	for (int i = 0; i < sceneVertexCount * 4; ++i) {
+		cout << perspectiveVertices[i];
+		if ((i + 1) % 4 == 0) {
+			cout << endl;
+		} else {
+			cout << ",\t";
+		}
 	}
+	cout << endl;
+	for (int i = 0; i < sceneVertexCount * 3; ++i) {
+		cout << screenCoordinates[i];
+		if ((i + 1) % 3 == 0) {
+			cout << endl;
+		} else {
+			cout << ",\t";
+		}
+	}
+	cout << endl;
+
+
+	transformations.convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
+	                                                k.get_blocksToLaunchForVertices(),
+	                                                k.get_threadsToLaunchForVertices(),
+	                                                screenCoordinates);
+
+//	for (int i = 0; i < sceneVertexCount; ++i) {
+//		screenCoordinates[i * 3] =
+//			(perspectiveVertices[i * 4] / perspectiveVertices[i * 4 + 3] + 1) * screenWidth / 2;
+//		screenCoordinates[i * 3 + 1] =
+//			(perspectiveVertices[i * 4 + 1] / perspectiveVertices[i * 4 + 3] + 1) * screenHeight / 2;
+//		screenCoordinates[i * 3 + 2] = perspectiveVertices[i * 4 + 3];
+//	}
 
 	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
 
@@ -143,14 +166,15 @@ int main() {
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetReadMostly, k.get_cpuID());
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 	for (int i = 0; i < sceneVertexCount; ++i) {
-		cout << screenCoordinates[i * 3] << ", " << screenCoordinates[i * 3 + 1] << ", " << screenCoordinates[i * 3 + 2]
+		cout << screenCoordinates[i * 3] << ",\t" << screenCoordinates[i * 3 + 1] << ",\t"
+		     << screenCoordinates[i * 3 + 2]
 		     << endl;
-		unsigned int screenCoordinate = cartesianToLinear(screenCoordinates[i * 3], screenCoordinates[i * 3 + 1],
-		                                                  screenWidth);
-		pixData[screenCoordinate * 4] = 1.0f;
-		pixData[screenCoordinate * 4 + 1] = 1.0f;
-		pixData[screenCoordinate * 4 + 2] = 1.0f;
-		pixData[screenCoordinate * 4 + 3] = 1.0f;
+//		unsigned int screenCoordinate = cartesianToLinear(screenCoordinates[i * 3], screenCoordinates[i * 3 + 1],
+//		                                                  screenWidth);
+//		pixData[screenCoordinate * 4] = 1.0f;
+//		pixData[screenCoordinate * 4 + 1] = 1.0f;
+//		pixData[screenCoordinate * 4 + 2] = 1.0f;
+//		pixData[screenCoordinate * 4 + 3] = 1.0f;
 	}
 
 

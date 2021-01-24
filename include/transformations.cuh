@@ -39,8 +39,8 @@ public:
 
 	void convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output);
 
-	static void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth, float screenHeight,
-	                                     float *output);
+	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth,
+	                                     float screenHeight, unsigned int blocks, unsigned int threads, float *output);
 
 	void cleanup() {
 		free(worldToPerspectiveMatrix);

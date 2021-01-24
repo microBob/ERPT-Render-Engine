@@ -111,14 +111,27 @@ void Transformations::convertWorldToPerspectiveSpace(float *input, const int ver
 }
 
 void Transformations::convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth,
-                                                      float screenHeight,
+                                                      float screenHeight, unsigned int blocks, unsigned int threads,
                                                       float *output) {
 	// Half screen dimension
 	float halfWidth = screenWidth / 2;
 	float halfHeight = screenHeight / 2;
 
+	cout << "blocks: " << blocks << endl;
+	cout << "threads: " << threads << endl << endl;
+
 	// Run kernel
-	convertToScreenSpaceKernel<<<k.get_blocksToLaunchForVertices(), k.get_threadsToLaunchForVertices()>>>(
+	convertToScreenSpaceKernel<<<blocks, threads>>>(
 		input, vertexCount, halfWidth, halfHeight, output);
 	cudaDeviceSynchronize();
+//
+//	for (int i = 0; i < vertexCount * 3; ++i) {
+//		cout << output[i];
+//		if ((i + 1) % 3 == 0) {
+//			cout << endl;
+//		} else {
+//			cout << ",\t";
+//		}
+//	}
+//	cout << endl;
 }
