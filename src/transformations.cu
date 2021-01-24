@@ -41,51 +41,44 @@ convertToScreenSpaceKernel(float *input, const int vertexCount, float screenWidt
 //// SECTION: Transformations implementation
 void
 Transformations::set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ,
-                                              float fov,
-                                              float screenWidth, float screenHeight, float zNear, float zFar) {
+                                              float fov, float screenRatio, float zNear, float zFar) {
 	// Common values
 	float tanFov = tan(fov / 2);
-	float wTanFov = screenWidth * tanFov;
-	float nearFar = zNear - zFar;
-	float comExpr1 = (-cos(rotX) * sin(rotZ) + cos(rotZ) * sin(rotX) * sin(rotY)) / tanFov;
-	float comExpr2 = (-2 * sin(rotX) * sin(rotZ) - 2 * cos(rotX) * cos(rotZ) * sin(rotY)) / nearFar;
-	float comExpr3 = -sin(rotX) * sin(rotZ) - cos(rotX) * cos(rotZ) * sin(rotY);
-	float comExpr4 = (cos(rotX) * cos(rotZ) + sin(rotX) * sin(rotY) * sin(rotZ)) / tanFov;
-	float comExpr5 = (2 * cos(rotZ) * sin(rotX) - 2 * cos(rotX) * sin(rotY) * sin(rotZ)) / nearFar;
-	float comExpr6 = cos(rotZ) * sin(rotX) - cos(rotX) * sin(rotY) * sin(rotZ);
-	float comExpr7 = cos(rotY) * sin(rotX) / tanFov;
+	float zClip = zFar - zNear;
+	float comExp1 = sin(rotX) * sin(rotZ);
+	float comExp2 = sin(rotY) * cos(rotX) * cos(rotZ);
+	float comExp3 = sin(rotY) * sin(rotZ) * cos(rotX);
 
-	/// Copy in matrix
-	// 1
-	worldToPerspectiveMatrix[0] = screenHeight * cos(rotY) * cos(rotZ) / wTanFov;
-	worldToPerspectiveMatrix[1] = comExpr1;
-	worldToPerspectiveMatrix[2] = comExpr2;
-	worldToPerspectiveMatrix[3] = comExpr3;
-	// 2
-	worldToPerspectiveMatrix[4] = screenHeight * cos(rotY) * sin(rotZ) / wTanFov;
-	worldToPerspectiveMatrix[5] = comExpr4;
-	worldToPerspectiveMatrix[6] = comExpr5;
-	worldToPerspectiveMatrix[7] = comExpr6;
-	// 3
-	worldToPerspectiveMatrix[8] = -screenHeight * sin(rotY) / wTanFov;
-	worldToPerspectiveMatrix[9] = comExpr7;
-	worldToPerspectiveMatrix[10] = -2 * cos(rotX) * cos(rotY) / nearFar;
+	// Set Matrix
+	worldToPerspectiveMatrix[0] = cos(rotY) * cos(rotZ) / tanFov;
+	worldToPerspectiveMatrix[1] = screenRatio * (sin(rotX) * sin(rotY) * cos(rotZ) - sin(rotZ) * cos(rotX)) / tanFov;
+	worldToPerspectiveMatrix[2] = 2 * (comExp1 + comExp2) / zClip;
+	worldToPerspectiveMatrix[3] = -sin(rotX) * sin(rotZ) - comExp2;
+
+	worldToPerspectiveMatrix[4] = sin(rotZ) * cos(rotY) / tanFov;
+	worldToPerspectiveMatrix[5] = screenRatio * (sin(rotX) * sin(rotY) * sin(rotZ) + cos(rotX) * cos(rotZ)) / tanFov;
+	worldToPerspectiveMatrix[6] = 2 * (-sin(rotX) * cos(rotZ) + comExp3) / zClip;
+	worldToPerspectiveMatrix[7] = sin(rotX) * cos(rotZ) - comExp3;
+
+	worldToPerspectiveMatrix[8] = -sin(rotY) / tanFov;
+	worldToPerspectiveMatrix[9] = screenRatio * sin(rotX) * cos(rotY) / tanFov;
+	worldToPerspectiveMatrix[10] = 2 * cos(rotX) * cos(rotY) / zClip;
 	worldToPerspectiveMatrix[11] = -cos(rotX) * cos(rotY);
-	// 4
+
 	worldToPerspectiveMatrix[12] =
-		(-cos(rotZ) * screenHeight * locX * cos(rotY) - sin(rotZ) * screenHeight * locY * cos(rotY) +
-		 screenHeight * locZ * sin(rotY)) / wTanFov;
-	worldToPerspectiveMatrix[13] = -(locX * (sin(rotX) * sin(rotY) * cos(rotZ) - sin(rotZ) * cos(rotX)) +
-	                                 locY * (sin(rotX) * sin(rotY) * sin(rotZ) + cos(rotX) * cos(rotZ)) +
-	                                 locZ * sin(rotX) * cos(rotY)) / tanFov;
-	worldToPerspectiveMatrix[14] = ((float) pow(zFar - zNear, 2) + 2 * (zFar + zNear) *
-	                                                               (-locX * (sin(rotX) * sin(rotZ) +
-	                                                                         sin(rotY) * cos(rotX) * cos(rotZ)) +
-	                                                                locY * (sin(rotX) * cos(rotZ) -
-	                                                                        sin(rotY) * sin(rotZ) * cos(rotX)) -
-	                                                                locZ * cos(rotX) * cos(rotY))) /
-	                               ((zFar - zNear) * (zFar + zNear));
-	worldToPerspectiveMatrix[15] = -locX * comExpr3 - locY * comExpr6 + locZ * cos(rotX) * cos(rotY);
+		(-locX * cos(rotY) * cos(rotZ) - locY * sin(rotZ) * cos(rotY) + locZ * sin(rotY)) / tanFov;
+	worldToPerspectiveMatrix[13] = -screenRatio * (locX * (sin(rotX) * sin(rotY) * cos(rotZ) - sin(rotZ) * cos(rotX)) +
+	                                               locY * (sin(rotX) * sin(rotY) * sin(rotZ) + cos(rotX) * cos(rotZ)) +
+	                                               locZ * sin(rotX) * cos(rotY)) /
+	                               tanFov;
+	worldToPerspectiveMatrix[14] = ((float) pow(zClip, 2) + 2 * (zFar + zNear) * (-locX * (comExp1 +
+	                                                                                       comExp2) +
+	                                                                              locY * (sin(rotX) * cos(rotZ) -
+	                                                                                      comExp3) -
+	                                                                              locZ * cos(rotX) * cos(rotY))) / (
+		                               zClip * (zFar + zNear));
+	worldToPerspectiveMatrix[15] = locX * (comExp1 + comExp2) - locY * (sin(rotX) * cos(rotZ) -
+	                                                                    comExp3) + locZ * cos(rotX) * cos(rotY);
 }
 
 void Transformations::convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output) {

@@ -66,8 +66,9 @@ int main() {
 	// Once all Verified, set translation matrix
 	transformations.set_worldToPerspectiveMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
 	                                             cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
-	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(), cameraFov,
-	                                             screenWidth, screenHeight, cameraClipping[0].GetFloat(),
+	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(),
+	                                             cameraFov, screenWidth / screenHeight,
+	                                             cameraClipping[0].GetFloat(),
 	                                             cameraClipping[1].GetFloat());
 
 	/// Decompose mesh data into vertices

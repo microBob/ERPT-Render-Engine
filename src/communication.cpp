@@ -71,7 +71,7 @@ Document Communication::ReceiveData() const {
 
 	// Read and parse render data into JSON
 	string dataString(dataBuffer.begin(), dataBuffer.end()); // Convert buffer into string
-//	cout << dataString << endl;
+	cout << dataString << endl;
 	Document renderDataDOM;
 	renderDataDOM.Parse(dataString.c_str());
 
