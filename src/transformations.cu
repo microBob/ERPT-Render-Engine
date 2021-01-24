@@ -39,7 +39,8 @@ convertToScreenSpaceKernel(float *input, const int vertexCount, float screenWidt
 
 //// SECTION: Transformations implementation
 void
-Transformations::set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ, float fov,
+Transformations::set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ,
+                                              float fov,
                                               float screenWidth, float screenHeight, float zNear, float zFar) {
 	// Common values
 	float tanFov = tan(fov / 2);
@@ -73,9 +74,16 @@ Transformations::set_worldToPerspectiveMatrix(float locX, float locY, float locZ
 	worldToPerspectiveMatrix[12] =
 		(-cos(rotZ) * screenHeight * locX * cos(rotY) - sin(rotZ) * screenHeight * locY * cos(rotY) +
 		 screenHeight * locZ * sin(rotY)) / wTanFov;
-	worldToPerspectiveMatrix[13] = -locX * comExpr1 - locY * comExpr2 - locZ * comExpr7;
-	worldToPerspectiveMatrix[14] =
-		-locX * comExpr2 - locY * comExpr5 + (-zNear + zFar) / (zNear + zFar) + 2 * cos(rotX) * cos(rotY) / -nearFar;
+	worldToPerspectiveMatrix[13] = -(locX * (sin(rotX) * sin(rotY) * cos(rotZ) - sin(rotZ) * cos(rotX)) +
+	                                 locY * (sin(rotX) * sin(rotY) * sin(rotZ) + cos(rotX) * cos(rotZ)) +
+	                                 locZ * sin(rotX) * cos(rotY)) / tanFov;
+	worldToPerspectiveMatrix[14] = ((float) pow(zFar - zNear, 2) + 2 * (zFar + zNear) *
+	                                                               (-locX * (sin(rotX) * sin(rotZ) +
+	                                                                         sin(rotY) * cos(rotX) * cos(rotZ)) +
+	                                                                locY * (sin(rotX) * cos(rotZ) -
+	                                                                        sin(rotY) * sin(rotZ) * cos(rotX)) -
+	                                                                locZ * cos(rotX) * cos(rotY))) /
+	                               ((zFar - zNear) * (zFar + zNear));
 	worldToPerspectiveMatrix[15] = -locX * comExpr3 - locY * comExpr6 + locZ * cos(rotX) * cos(rotY);
 
 	for (int i = 0; i < 16; ++i) {
