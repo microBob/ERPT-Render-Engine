@@ -3,8 +3,8 @@
 #include "include/communication.h"
 #include "include/transformations.cuh"
 
-unsigned int cartesianToLinear(float x, float y, float screenWidth, float screenHeight) {
-	return (unsigned int) (y * screenWidth + x);
+unsigned int cartesianToLinear(float x, float y, float screenWidth) {
+	return (unsigned int) (round(y) * screenWidth + round(x));
 }
 
 int main() {
@@ -41,12 +41,12 @@ int main() {
 	screenWidth = resolutionData[0].GetFloat();
 	screenHeight = resolutionData[1].GetFloat();
 
-	size_t pixDataSize = screenWidth * screenHeight * 4 *
-	                     sizeof(float); // Assume 1080 in case of read failure
+	size_t pixDataByteSize = screenWidth * screenHeight * 4 * sizeof(float);
 
-	cudaMallocManaged(&pixData, pixDataSize);
-	cudaMemPrefetchAsync(pixData, pixDataSize, k.get_cpuID());
-	for (int i = 0; i < pixDataSize / sizeof(float); ++i) { // Fill pixData with a black screen
+	cudaMallocManaged(&pixData, pixDataByteSize);
+	cudaMemPrefetchAsync(pixData, pixDataByteSize, k.get_cpuID());
+//	fill_n(pixData, pixDataByteSize, 0);
+	for (int i = 0; i < pixDataByteSize / sizeof(float); ++i) { // Fill pixData with a black screen
 		if ((i + 1) % 4 == 0) { // Set alpha to 1
 			pixData[i] = 1;
 		} else { // Set everything else to 0
@@ -142,18 +142,19 @@ int main() {
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetReadMostly, k.get_cpuID());
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 	for (int i = 0; i < sceneVertexCount; ++i) {
-		cout << screenCoordinates[i * 3] << ", " << screenCoordinates[i * 3 + 1] << endl;
+		cout << screenCoordinates[i * 3] << ", " << screenCoordinates[i * 3 + 1] << ", " << screenCoordinates[i * 3 + 2]
+		     << endl;
 		unsigned int screenCoordinate = cartesianToLinear(screenCoordinates[i * 3], screenCoordinates[i * 3 + 1],
-		                                                  screenWidth, screenHeight);
-		pixData[screenCoordinate] = 1.0f;
-		pixData[screenCoordinate + 1] = 1.0f;
-		pixData[screenCoordinate + 2] = 1.0f;
-		pixData[screenCoordinate + 3] = 1.0f;
+		                                                  screenWidth);
+		pixData[screenCoordinate * 4] = 1.0f;
+		pixData[screenCoordinate * 4 + 1] = 1.0f;
+		pixData[screenCoordinate * 4 + 2] = 1.0f;
+		pixData[screenCoordinate * 4 + 3] = 1.0f;
 	}
 
 
 	//// SECTION: Convert and send data
-	com.ConvertAndSend(pixData, pixDataSize);
+	com.ConvertAndSend(pixData, pixDataByteSize);
 
 
 	//// SECTION: Cleanup
