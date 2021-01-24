@@ -15,21 +15,22 @@ convertToScreenSpaceKernel(float *input, const int vertexCount, float screenWidt
 
 	while (tid < vertexCount) {
 		// Skip if point is outside of z-cull space
-		if (abs(input[sceneToLinearGPU(tid, 2, 0)]) > 1) {
+		if (abs(input[sceneToLinearGPU(tid, 2, 4)]) > 1) {
 			tid += increment;
 			continue;
 		}
 		// Skip if point will cause divide by 0
-		if (input[sceneToLinearGPU(tid, 3, 0)] == 0) {
+		if (input[sceneToLinearGPU(tid, 3, 4)] == 0) {
 			tid += increment;
 			continue;
 		}
 
 		// Calculate final x and y
-		output[sceneToLinearGPU(tid, 0, 2)] =
+		output[sceneToLinearGPU(tid, 0, 3)] =
 			(input[sceneToLinearGPU(tid, 0, 4)] / input[sceneToLinearGPU(tid, 3, 4)] + 1) * screenWidth;
-		output[sceneToLinearGPU(tid, 1, 2)] =
+		output[sceneToLinearGPU(tid, 1, 3)] =
 			(input[sceneToLinearGPU(tid, 1, 4)] / input[sceneToLinearGPU(tid, 3, 4)] + 1) * screenHeight;
+		output[sceneToLinearGPU(tid, 2, 3)] = input[sceneToLinearGPU(tid, 3, 4)];
 
 		// Increment tid
 		tid += increment;
@@ -85,11 +86,6 @@ Transformations::set_worldToPerspectiveMatrix(float locX, float locY, float locZ
 	                                                                locZ * cos(rotX) * cos(rotY))) /
 	                               ((zFar - zNear) * (zFar + zNear));
 	worldToPerspectiveMatrix[15] = -locX * comExpr3 - locY * comExpr6 + locZ * cos(rotX) * cos(rotY);
-
-	for (int i = 0; i < 16; ++i) {
-		cout << i << ": " << worldToPerspectiveMatrix[i] << endl;
-	}
-	cout << endl << endl;
 }
 
 void Transformations::convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output) {
@@ -124,10 +120,6 @@ void Transformations::convertWorldToPerspectiveSpace(float *input, const int ver
 void Transformations::convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth,
                                                       float screenHeight,
                                                       float *output) {
-	// Define and malloc screenCoordinates
-	cudaMallocManaged(&output, 2 * vertexCount * sizeof(float));
-	cudaMemPrefetchAsync(output, 2 * vertexCount * sizeof(float), k.get_gpuID());
-
 	// Half screen dimension
 	float halfWidth = screenWidth / 2;
 	float halfHeight = screenHeight / 2;

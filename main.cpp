@@ -4,7 +4,7 @@
 #include "include/transformations.cuh"
 
 unsigned int cartesianToLinear(float x, float y, float screenWidth, float screenHeight) {
-	return (unsigned int) ((y + screenHeight / 2) * screenWidth + (x + screenWidth / 2));
+	return (unsigned int) (y * screenWidth + x);
 }
 
 int main() {
@@ -46,7 +46,13 @@ int main() {
 
 	cudaMallocManaged(&pixData, pixDataSize);
 	cudaMemPrefetchAsync(pixData, pixDataSize, k.get_cpuID());
-	fill_n(pixData, pixDataSize / sizeof(float), 0); // Fill with black screen
+	for (int i = 0; i < pixDataSize / sizeof(float); ++i) { // Fill pixData with a black screen
+		if ((i + 1) % 4 == 0) { // Set alpha to 1
+			pixData[i] = 1;
+		} else { // Set everything else to 0
+			pixData[i] = 0;
+		}
+	}
 
 
 	//// SECTION: Convert Data to screen space
@@ -96,6 +102,8 @@ int main() {
 	float *perspectiveVertices;
 	// Initialize output
 	cudaMallocManaged(&perspectiveVertices, sceneVerticesByteSize);
+	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_cpuID());
+	fill_n(perspectiveVertices, sceneVerticesByteSize, 0);
 	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
 	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
 	// Convert world to perspective
@@ -103,18 +111,29 @@ int main() {
 
 	/// Convert perspective to screen coordinates
 	float *screenCoordinates;
-	size_t screenCoordinatesByteSize = 2 * sceneVertexCount * sizeof(float);
+	size_t screenCoordinatesByteSize = 3 * sceneVertexCount * sizeof(float);
 	// Initialize output
 	cudaMallocManaged(&screenCoordinates, screenCoordinatesByteSize);
-	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_gpuID());
+	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
+	fill_n(screenCoordinates, screenCoordinatesByteSize, 0);
+//	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+//	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_gpuID());
 	// MemAdvise input
 	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
 	// Convert perspective to screen
-	k.set_kernelThreadsAndBlocks(sceneVertexCount);
-	transformations.convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
-	                                                screenCoordinates);
+//	k.set_kernelThreadsAndBlocks(sceneVertexCount);
+//	Transformations::convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
+//	                                                 screenCoordinates);
+
+	for (int i = 0; i < sceneVertexCount; ++i) {
+		screenCoordinates[i * 3] =
+			(perspectiveVertices[i * 4] / perspectiveVertices[i * 4 + 3] + 1) * screenWidth / 2;
+		screenCoordinates[i * 3 + 1] =
+			(perspectiveVertices[i * 4 + 1] / perspectiveVertices[i * 4 + 3] + 1) * screenHeight / 2;
+		screenCoordinates[i * 3 + 2] = perspectiveVertices[i * 4 + 3];
+	}
+
 	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
 
 	//// SECTION: Draw point cloud
@@ -123,8 +142,8 @@ int main() {
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetReadMostly, k.get_cpuID());
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 	for (int i = 0; i < sceneVertexCount; ++i) {
-		cout << screenCoordinates[i * 2] << ", " << screenCoordinates[i * 2 + 1] << endl;
-		unsigned int screenCoordinate = cartesianToLinear(screenCoordinates[i * 2], screenCoordinates[i * 2 + 1],
+		cout << screenCoordinates[i * 3] << ", " << screenCoordinates[i * 3 + 1] << endl;
+		unsigned int screenCoordinate = cartesianToLinear(screenCoordinates[i * 3], screenCoordinates[i * 3 + 1],
 		                                                  screenWidth, screenHeight);
 		pixData[screenCoordinate] = 1.0f;
 		pixData[screenCoordinate + 1] = 1.0f;

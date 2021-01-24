@@ -38,7 +38,7 @@ public:
 
 	void convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output);
 
-	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth, float screenHeight,
+	static void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth, float screenHeight,
 	                                     float *output);
 
 	void cleanup() {
