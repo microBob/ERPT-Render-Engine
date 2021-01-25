@@ -8,7 +8,7 @@ Kernels::Kernels() { // NOLINT(cppcoreguidelines-pro-type-member-init)
 }
 
 void Kernels::set_kernelThreadsAndBlocks(int sceneVertexCount) {
-	threadsToLaunchForVertices = std::min(prop.maxThreadsPerBlock, (int) sceneVertexCount);
+	threadsToLaunchForVertices = min(prop.maxThreadsPerBlock, (int) sceneVertexCount);
 	blocksToLaunchForVertices = min(prop.maxGridSize[0],
-	                                1 + ((int) sceneVertexCount / prop.maxThreadsPerBlock));
+	                                1 + (sceneVertexCount / prop.maxThreadsPerBlock));
 }

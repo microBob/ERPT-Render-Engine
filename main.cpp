@@ -3,6 +3,38 @@
 #include "include/communication.h"
 #include "include/transformations.cuh"
 
+unsigned int cartesianToLinear(float x, float y, float screenWidth) {
+	return (unsigned int) (round(y) * screenWidth + round(x));
+}
+
+void drawDot(float x, float y, float *output, float screenWidth) {
+	unsigned int screenCoordinate = cartesianToLinear(x, y, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x + 1, y, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x, y + 1, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x - 1, y, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x, y - 1, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+}
+
 int main() {
 	//// SECTION: Variables and instances
 	/// Class instances
@@ -37,27 +69,35 @@ int main() {
 	screenWidth = resolutionData[0].GetFloat();
 	screenHeight = resolutionData[1].GetFloat();
 
-	size_t pixDataSize = screenWidth * screenHeight * 4 *
-	                     sizeof(float); // Assume 1080 in case of read failure
+	size_t pixDataByteSize = screenWidth * screenHeight * 4 * sizeof(float);
 
-	cudaMallocManaged(&pixData, pixDataSize);
-	cudaMemPrefetchAsync(pixData, pixDataSize, k.get_cpuID());
-	fill_n(pixData, pixDataSize / sizeof(float), 1.0f);
+	cudaMallocManaged(&pixData, pixDataByteSize);
+	cudaMemPrefetchAsync(pixData, pixDataByteSize, k.get_cpuID());
+//	fill_n(pixData, pixDataByteSize, 0);
+	for (int i = 0; i < pixDataByteSize / sizeof(float); ++i) { // Fill pixData with a black screen
+		if ((i + 1) % 4 == 0) { // Set alpha to 1
+			pixData[i] = 1;
+		} else { // Set everything else to 0
+			pixData[i] = 0;
+		}
+	}
 
 
-	//// SECTION: Convert to Camera space
+	//// SECTION: Convert Data to screen space
 	/// Create camera matrix
 	// Get camera data and verify existence
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
-	// Verify location data exists
 	auto cameraLocation = cameraDataDOM.FindMember(LOCATION)->value.GetArray();
-	// Verify rotation data exists
 	auto cameraRotation = cameraDataDOM.FindMember(ROTATION)->value.GetArray();
+	auto cameraFov = cameraDataDOM.FindMember(FOV)->value.GetFloat();
+	auto cameraClipping = cameraDataDOM.FindMember(CLIP)->value.GetArray();
 	// Once all Verified, set translation matrix
 	transformations.set_worldToPerspectiveMatrix(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(),
 	                                             cameraLocation[2].GetFloat(), cameraRotation[0].GetFloat(),
-	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(), 0, 0, 0, 0,
-	                                             0);
+	                                             cameraRotation[1].GetFloat(), cameraRotation[2].GetFloat(),
+	                                             cameraFov, screenWidth / screenHeight,
+	                                             cameraClipping[0].GetFloat(),
+	                                             cameraClipping[1].GetFloat());
 
 	/// Decompose mesh data into vertices
 	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetArray();
@@ -79,8 +119,8 @@ int main() {
 	cudaMallocManaged(&sceneVertices, sceneVerticesByteSize);
 	// Transfer to CPU
 	cudaMemPrefetchAsync(sceneVertices, sceneVerticesByteSize, k.get_cpuID());
-	// Set values
-	sceneVertices = &rawVertices[0];
+	// Convert values from vector to array
+	copy(rawVertices.begin(), rawVertices.end(), sceneVertices);
 	// Switch to GPU
 	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
 	cudaMemAdvise(sceneVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
@@ -91,6 +131,8 @@ int main() {
 	float *perspectiveVertices;
 	// Initialize output
 	cudaMallocManaged(&perspectiveVertices, sceneVerticesByteSize);
+	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_cpuID());
+	fill_n(perspectiveVertices, sceneVerticesByteSize, 0);
 	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
 	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
 	// Convert world to perspective
@@ -98,22 +140,127 @@ int main() {
 
 	/// Convert perspective to screen coordinates
 	float *screenCoordinates;
+	size_t screenCoordinatesByteSize = 3 * sceneVertexCount * sizeof(float);
 	// Initialize output
-	cudaMallocManaged(&screenCoordinates, sceneVerticesByteSize / 2);
-	cudaMemAdvise(screenCoordinates, sceneVerticesByteSize / 2, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
-	cudaMemPrefetchAsync(screenCoordinates, sceneVerticesByteSize / 2, k.get_gpuID());
+	cudaMallocManaged(&screenCoordinates, screenCoordinatesByteSize);
+	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
+	fill_n(screenCoordinates, screenCoordinatesByteSize, -1);
+	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_gpuID());
+	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_gpuID());
 	// MemAdvise input
 	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
 	// Convert perspective to screen
-	k.set_kernelThreadsAndBlocks(sceneVertexCount);
-	transformations.convertPerspectiveToScreenSpace(perspectiveVertices, sceneVertexCount, screenWidth, screenHeight,
-	                                                screenCoordinates);
+//	k.set_kernelThreadsAndBlocks(sceneVertexCount);
+
+
+	for (int i = 0; i < sceneVertexCount; ++i) {
+		if (abs(perspectiveVertices[i * 4 + 2]) > 1) {
+			cout << "Skipping outside" << endl;
+			continue;
+		}
+		// Skip if point will cause divide by 0
+		if (perspectiveVertices[i * 4 + 3] == 0) {
+			cout << "Skipping div by 0" << endl;
+			continue;
+		}
+
+		screenCoordinates[i * 3] =
+			(perspectiveVertices[i * 4] / perspectiveVertices[i * 4 + 3] + 1) * screenWidth / 2;
+		screenCoordinates[i * 3 + 1] =
+			(perspectiveVertices[i * 4 + 1] / perspectiveVertices[i * 4 + 3] + 1) * screenHeight / 2;
+		screenCoordinates[i * 3 + 2] = perspectiveVertices[i * 4 + 3];
+	}
+
 	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
+
+	//// SECTION: Draw Wireframe
+	/// Switch screenCoordinates to CPU
+	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_cpuID());
+	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetReadMostly, k.get_cpuID());
+	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
+
+	/// Extract connected vertices
+	vector<vector<unsigned int >> connectedVertices;
+	for (int i = 0; i < meshDataDOM.Size(); ++i) { // Loop through every mesh in scene
+		auto curMesh = meshDataDOM[i].GetObject();
+
+		// Calculate vertex number offset (based on how many meshes came before)
+		unsigned int vertexOffset = 0;
+		for (int j = 0; j < i; ++j) {
+			vertexOffset += meshDataDOM[j].GetObject().FindMember(
+				VERTICES)->value.GetArray().Size(); // Add on # of vertices that came before
+		}
+
+		// Loop through every face in mesh
+		for (auto &curMeshFaces : curMesh.FindMember(FACES)->value.GetArray()) {
+			auto curMeshFaceVertices = curMeshFaces.GetObject().FindMember(VERTICES)->value.GetArray();
+			for (int l = 0; l < curMeshFaceVertices.Size(); ++l) { // Loop through every vertex on face
+				if (l == curMeshFaceVertices.Size() - 1) { // Make sure to add closing connection
+					connectedVertices.push_back(
+						{vertexOffset + curMeshFaceVertices[0].GetUint(),
+						 vertexOffset + curMeshFaceVertices[l].GetUint()});
+				} else {
+					connectedVertices.push_back({vertexOffset + curMeshFaceVertices[l].GetUint(),
+					                             vertexOffset + curMeshFaceVertices[l + 1].GetUint()});
+				}
+			}
+		}
+	}
+
+	/// Draw edges between vertices
+	for (auto &connection : connectedVertices) {
+		// Get vertices
+		float tar[] = {screenCoordinates[connection[0] * 3],
+		               screenCoordinates[connection[0] * 3 + 1],
+		               screenCoordinates[connection[0] * 3 + 2]};
+		float src[] = {screenCoordinates[connection[1] * 3],
+		               screenCoordinates[connection[1] * 3 + 1],
+		               screenCoordinates[connection[1] * 3 + 2]};
+
+		// Skip if was also skipped during conversion (left as -1 in conversion)
+		if (tar[0] == -1 || src[0] == -1) {
+			cout << "Skipping divide by 0" << endl;
+			continue;
+		}
+
+		// get direction vector
+		float dirX = tar[0] - src[0];
+		float dirY = tar[1] - src[1];
+
+		// calculate normalized vector
+		float mag = sqrt(dirX * dirX + dirY * dirY);
+		if (mag == 0) { // skip if the points have no delta
+			continue;
+		}
+		float normX = dirX / mag;
+		float normY = dirY / mag;
+
+		// draw points while moving along
+		float drawX = src[0];
+		float drawY = src[1];
+
+		// keep track of how far you have left
+		int drawXDelta;
+		int drawYDelta;
+
+		do {
+			drawX += normX;
+			drawY += normY;
+			drawXDelta = (int) round(abs(tar[0] - drawX));
+			drawYDelta = (int) round(abs(tar[1] - drawY));
+
+			if (drawX > screenWidth || drawX < 0 || drawY > screenHeight ||
+			    drawY < 0) {
+				break;
+			}
+			drawDot(drawX, drawY, pixData, screenWidth);
+		} while (drawXDelta >= 3 || drawYDelta >= 3);
+	}
 
 
 	//// SECTION: Convert and send data
-	com.ConvertAndSend(pixData, pixDataSize);
+	com.ConvertAndSend(pixData, pixDataByteSize);
 
 
 	//// SECTION: Cleanup

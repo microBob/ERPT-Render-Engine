@@ -33,13 +33,14 @@ public:
 		cublasCreate(&handle);
 	}
 
-	void set_worldToPerspectiveMatrix(float x, float y, float z, float degX, float degY, float degZ, float fov,
-	                                  float screenWidth, float screenHeight, float zNear, float zFar);
+	void
+	set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ,
+	                             float fov, float screenRatio, float zNear, float zFar);
 
 	void convertWorldToPerspectiveSpace(float *input, const int vertexCount, float *output);
 
-	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth, float screenHeight,
-	                                     float *output);
+	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth,
+	                                     float screenHeight, unsigned int blocks, unsigned int threads, float *output);
 
 	void cleanup() {
 		free(worldToPerspectiveMatrix);
