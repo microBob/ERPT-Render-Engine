@@ -153,24 +153,6 @@ int main() {
 	// Convert perspective to screen
 //	k.set_kernelThreadsAndBlocks(sceneVertexCount);
 
-//	for (int i = 0; i < sceneVertexCount * 4; ++i) {
-//		cout << perspectiveVertices[i];
-//		if ((i + 1) % 4 == 0) {
-//			cout << endl;
-//		} else {
-//			cout << ",\t";
-//		}
-//	}
-//	cout << endl;
-//	for (int i = 0; i < sceneVertexCount * 3; ++i) {
-//		cout << screenCoordinates[i];
-//		if ((i + 1) % 3 == 0) {
-//			cout << endl;
-//		} else {
-//			cout << ",\t";
-//		}
-//	}
-//	cout << endl;
 
 	for (int i = 0; i < sceneVertexCount; ++i) {
 		if (abs(perspectiveVertices[i * 4 + 2]) > 1) {
@@ -197,36 +179,36 @@ int main() {
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_cpuID());
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetReadMostly, k.get_cpuID());
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
-	for (int i = 0; i < sceneVertexCount; ++i) {
-		cout << screenCoordinates[i * 3] << ",\t" << screenCoordinates[i * 3 + 1] << ",\t"
-		     << screenCoordinates[i * 3 + 2]
-		     << endl;
-	}
-	cout << endl << endl;
 
+	/// Extract connected vertices
 	vector<vector<unsigned int >> connectedVertices;
-	for (int i = 0; i < meshDataDOM.Size(); ++i) {
+	for (int i = 0; i < meshDataDOM.Size(); ++i) { // Loop through every mesh in scene
 		auto curMesh = meshDataDOM[i].GetObject();
 
+		// Calculate vertex number offset (based on how many meshes came before)
 		unsigned int vertexOffset = 0;
 		for (int j = 0; j < i; ++j) {
-			vertexOffset += meshDataDOM[j].GetObject().FindMember(VERTICES)->value.GetArray().Size();
+			vertexOffset += meshDataDOM[j].GetObject().FindMember(
+				VERTICES)->value.GetArray().Size(); // Add on # of vertices that came before
 		}
 
+		// Loop through every face in mesh
 		for (auto &curMeshFaces : curMesh.FindMember(FACES)->value.GetArray()) {
 			auto curMeshFaceVertices = curMeshFaces.GetObject().FindMember(VERTICES)->value.GetArray();
-			for (int l = 0; l < curMeshFaceVertices.Size(); ++l) {
-				if (l == curMeshFaceVertices.Size() - 1) {
+			for (int l = 0; l < curMeshFaceVertices.Size(); ++l) { // Loop through every vertex on face
+				if (l == curMeshFaceVertices.Size() - 1) { // Make sure to add closing connection
 					connectedVertices.push_back(
-						{curMeshFaceVertices[vertexOffset].GetUint(), curMeshFaceVertices[vertexOffset + l].GetUint()});
+						{vertexOffset + curMeshFaceVertices[0].GetUint(),
+						 vertexOffset + curMeshFaceVertices[l].GetUint()});
 				} else {
-					connectedVertices.push_back({curMeshFaceVertices[vertexOffset + l].GetUint(),
-					                             curMeshFaceVertices[vertexOffset + l + 1].GetUint()});
+					connectedVertices.push_back({vertexOffset + curMeshFaceVertices[l].GetUint(),
+					                             vertexOffset + curMeshFaceVertices[l + 1].GetUint()});
 				}
 			}
 		}
 	}
 
+	/// Draw edges between vertices
 	for (auto &connection : connectedVertices) {
 		// Get vertices
 		float tar[] = {screenCoordinates[connection[0] * 3],
@@ -236,7 +218,7 @@ int main() {
 		               screenCoordinates[connection[1] * 3 + 1],
 		               screenCoordinates[connection[1] * 3 + 2]};
 
-		// Skip if was also skipped during conversion
+		// Skip if was also skipped during conversion (left as -1 in conversion)
 		if (tar[0] == -1 || src[0] == -1) {
 			cout << "Skipping divide by 0" << endl;
 			continue;
