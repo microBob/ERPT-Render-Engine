@@ -3,37 +3,37 @@
 #include "include/communication.h"
 #include "include/transformations.cuh"
 
-unsigned int cartesianToLinear(float x, float y, float screenWidth) {
-	return (unsigned int) (round(y) * screenWidth + round(x));
-}
+//unsigned int cartesianToLinear(float x, float y, float screenWidth) {
+//	return (unsigned int) (round(y) * screenWidth + round(x));
+//}
 
-void drawDot(float x, float y, float *output, float screenWidth) {
-	unsigned int screenCoordinate = cartesianToLinear(x, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x + 1, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x, y + 1, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x - 1, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x, y - 1, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-}
+//void drawDot(float x, float y, float *output, float screenWidth) {
+//	unsigned int screenCoordinate = cartesianToLinear(x, y, screenWidth);
+//	output[screenCoordinate * 4] = 1.0f;
+//	output[screenCoordinate * 4 + 1] = 1.0f;
+//	output[screenCoordinate * 4 + 2] = 1.0f;
+//	output[screenCoordinate * 4 + 3] = 1.0f;
+//	screenCoordinate = cartesianToLinear(x + 1, y, screenWidth);
+//	output[screenCoordinate * 4] = 1.0f;
+//	output[screenCoordinate * 4 + 1] = 1.0f;
+//	output[screenCoordinate * 4 + 2] = 1.0f;
+//	output[screenCoordinate * 4 + 3] = 1.0f;
+//	screenCoordinate = cartesianToLinear(x, y + 1, screenWidth);
+//	output[screenCoordinate * 4] = 1.0f;
+//	output[screenCoordinate * 4 + 1] = 1.0f;
+//	output[screenCoordinate * 4 + 2] = 1.0f;
+//	output[screenCoordinate * 4 + 3] = 1.0f;
+//	screenCoordinate = cartesianToLinear(x - 1, y, screenWidth);
+//	output[screenCoordinate * 4] = 1.0f;
+//	output[screenCoordinate * 4 + 1] = 1.0f;
+//	output[screenCoordinate * 4 + 2] = 1.0f;
+//	output[screenCoordinate * 4 + 3] = 1.0f;
+//	screenCoordinate = cartesianToLinear(x, y - 1, screenWidth);
+//	output[screenCoordinate * 4] = 1.0f;
+//	output[screenCoordinate * 4 + 1] = 1.0f;
+//	output[screenCoordinate * 4 + 2] = 1.0f;
+//	output[screenCoordinate * 4 + 3] = 1.0f;
+//}
 
 int main() {
 	//// SECTION: Variables and instances
@@ -254,7 +254,7 @@ int main() {
 			    drawY < 0) {
 				break;
 			}
-			drawDot(drawX, drawY, pixData, screenWidth);
+			Transformations::drawDot(drawX, drawY, pixData, screenWidth);
 		} while (drawXDelta >= 3 || drawYDelta >= 3);
 	}
 

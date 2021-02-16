@@ -135,3 +135,35 @@ void Transformations::convertPerspectiveToScreenSpace(float *input, const int ve
 //	}
 //	cout << endl;
 }
+
+unsigned int Transformations::cartesianToLinear(float x, float y, float screenWidth) {
+	return (unsigned int) (round(y) * screenWidth + round(x));
+}
+
+void Transformations::drawDot(float x, float y, float *output, float screenWidth) {
+	unsigned int screenCoordinate = cartesianToLinear(x, y, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x + 1, y, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x, y + 1, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x - 1, y, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+	screenCoordinate = cartesianToLinear(x, y - 1, screenWidth);
+	output[screenCoordinate * 4] = 1.0f;
+	output[screenCoordinate * 4 + 1] = 1.0f;
+	output[screenCoordinate * 4 + 2] = 1.0f;
+	output[screenCoordinate * 4 + 3] = 1.0f;
+}

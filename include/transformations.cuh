@@ -33,6 +33,7 @@ public:
 		cublasCreate(&handle);
 	}
 
+	// Perspective projection
 	void
 	set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ,
 	                             float fov, float screenRatio, float zNear, float zFar);
@@ -41,6 +42,11 @@ public:
 
 	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth,
 	                                     float screenHeight, unsigned int blocks, unsigned int threads, float *output);
+
+	// Drawing data
+	static unsigned int cartesianToLinear(float x, float y, float screenWidth);
+
+	static void drawDot(float x, float y, float *output, float screenWidth);
 
 	void cleanup() {
 		free(worldToPerspectiveMatrix);
