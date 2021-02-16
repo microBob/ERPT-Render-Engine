@@ -9,7 +9,6 @@
 #include "kernels.cuh"
 #include "cublas_v2.h"
 
-#include <iostream>
 #include <cassert>
 
 
@@ -43,11 +42,10 @@ public:
 	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth,
 	                                     float screenHeight, unsigned int blocks, unsigned int threads, float *output);
 
-	// Drawing data
-	static unsigned int cartesianToLinear(float x, float y, float screenWidth);
+	static void convertPerspectiveToScreenSpaceCPU(float screenWidth, float screenHeight, int sceneVertexCount,
+	                                               const float *perspectiveVertices, float *screenCoordinates);
 
-	static void drawDot(float x, float y, float *output, float screenWidth);
-
+	// Cleanup
 	void cleanup() {
 		free(worldToPerspectiveMatrix);
 

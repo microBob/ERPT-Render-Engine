@@ -136,34 +136,23 @@ void Transformations::convertPerspectiveToScreenSpace(float *input, const int ve
 //	cout << endl;
 }
 
-unsigned int Transformations::cartesianToLinear(float x, float y, float screenWidth) {
-	return (unsigned int) (round(y) * screenWidth + round(x));
-}
+void Transformations::convertPerspectiveToScreenSpaceCPU(float screenWidth, float screenHeight, int sceneVertexCount,
+                                                         const float *perspectiveVertices, float *screenCoordinates) {
+	for (int i = 0; i < sceneVertexCount; ++i) {
+		if (abs(perspectiveVertices[i * 4 + 2]) > 1) {
+			cout << "Skipping outside" << endl;
+			continue;
+		}
+		// Skip if point will cause divide by 0
+		if (perspectiveVertices[i * 4 + 3] == 0) {
+			cout << "Skipping div by 0" << endl;
+			continue;
+		}
 
-void Transformations::drawDot(float x, float y, float *output, float screenWidth) {
-	unsigned int screenCoordinate = cartesianToLinear(x, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x + 1, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x, y + 1, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x - 1, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x, y - 1, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
+		screenCoordinates[i * 3] =
+			(perspectiveVertices[i * 4] / perspectiveVertices[i * 4 + 3] + 1) * screenWidth / 2;
+		screenCoordinates[i * 3 + 1] =
+			(perspectiveVertices[i * 4 + 1] / perspectiveVertices[i * 4 + 3] + 1) * screenHeight / 2;
+		screenCoordinates[i * 3 + 2] = perspectiveVertices[i * 4 + 3];
+	}
 }

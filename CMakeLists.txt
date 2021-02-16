@@ -11,7 +11,7 @@ add_executable(
 	include/constants.h
 	include/communication.h src/communication.cpp
 	include/kernels.cuh
-	include/transformations.cuh src/transformations.cu src/kernels.cu)
+	include/transformations.cuh src/transformations.cu src/kernels.cu include/drawings.cuh src/drawings.cu)
 add_executable(LABS labs/labs.cpp labs/another.h)
 
 # For project
