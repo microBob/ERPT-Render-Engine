@@ -8,6 +8,7 @@
 
 //// SECTION: Include
 #include "kernels.cuh"
+
 #include <iostream>
 #include <vector>
 #include "constants.h"

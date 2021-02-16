@@ -6,8 +6,8 @@
 #define ERPT_RENDER_ENGINE_KERNELS_CUH
 
 //// SECTION: Includes
-#include <cuda_runtime.h>
 #include <iostream>
+#include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
 using namespace std;

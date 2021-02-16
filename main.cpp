@@ -1,11 +1,11 @@
 #include "include/main.h"
 #include "include/kernels.cuh"
+#include "include/raytracing.h"
 #include "include/communication.h"
 #include "include/transformations.cuh"
 #include "include/drawings.cuh"
 
-
-int main() {
+extern "C" int main() {
 	//// SECTION: Variables and instances
 	/// Class instances
 	Communication com;
@@ -18,6 +18,15 @@ int main() {
 	size_t sceneVerticesByteSize;
 
 	float screenWidth, screenHeight;
+
+
+	//// SECTION: Initialize OptiX
+	try {
+		Raytracing::initOptix();
+	} catch (runtime_error &error) {
+		cout << error.what() << endl;
+		exit(1);
+	}
 
 
 	//// SECTION: Connect to addon and read in data
