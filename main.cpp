@@ -1,41 +1,11 @@
 #include "include/main.h"
 #include "include/kernels.cuh"
+#include "include/raytracing.h"
 #include "include/communication.h"
 #include "include/transformations.cuh"
+#include "include/drawings.cuh"
 
-unsigned int cartesianToLinear(float x, float y, float screenWidth) {
-	return (unsigned int) (round(y) * screenWidth + round(x));
-}
-
-void drawDot(float x, float y, float *output, float screenWidth) {
-	unsigned int screenCoordinate = cartesianToLinear(x, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x + 1, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x, y + 1, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x - 1, y, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-	screenCoordinate = cartesianToLinear(x, y - 1, screenWidth);
-	output[screenCoordinate * 4] = 1.0f;
-	output[screenCoordinate * 4 + 1] = 1.0f;
-	output[screenCoordinate * 4 + 2] = 1.0f;
-	output[screenCoordinate * 4 + 3] = 1.0f;
-}
-
-int main() {
+extern "C" int main() {
 	//// SECTION: Variables and instances
 	/// Class instances
 	Communication com;
@@ -48,6 +18,15 @@ int main() {
 	size_t sceneVerticesByteSize;
 
 	float screenWidth, screenHeight;
+
+
+	//// SECTION: Initialize OptiX
+	try {
+		Raytracing::initOptix();
+	} catch (runtime_error &error) {
+		cout << error.what() << endl;
+		exit(1);
+	}
 
 
 	//// SECTION: Connect to addon and read in data
@@ -151,26 +130,10 @@ int main() {
 	cudaMemAdvise(perspectiveVertices, sceneVerticesByteSize, cudaMemAdviseSetReadMostly, k.get_gpuID());
 	cudaMemPrefetchAsync(perspectiveVertices, sceneVerticesByteSize, k.get_gpuID());
 	// Convert perspective to screen
-//	k.set_kernelThreadsAndBlocks(sceneVertexCount);
-
-
-	for (int i = 0; i < sceneVertexCount; ++i) {
-		if (abs(perspectiveVertices[i * 4 + 2]) > 1) {
-			cout << "Skipping outside" << endl;
-			continue;
-		}
-		// Skip if point will cause divide by 0
-		if (perspectiveVertices[i * 4 + 3] == 0) {
-			cout << "Skipping div by 0" << endl;
-			continue;
-		}
-
-		screenCoordinates[i * 3] =
-			(perspectiveVertices[i * 4] / perspectiveVertices[i * 4 + 3] + 1) * screenWidth / 2;
-		screenCoordinates[i * 3 + 1] =
-			(perspectiveVertices[i * 4 + 1] / perspectiveVertices[i * 4 + 3] + 1) * screenHeight / 2;
-		screenCoordinates[i * 3 + 2] = perspectiveVertices[i * 4 + 3];
-	}
+	//	k.set_kernelThreadsAndBlocks(sceneVertexCount);
+	Transformations::convertPerspectiveToScreenSpaceCPU(screenWidth, screenHeight, sceneVertexCount,
+	                                                    perspectiveVertices,
+	                                                    screenCoordinates);
 
 	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
 
@@ -181,82 +144,10 @@ int main() {
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 
 	/// Extract connected vertices
-	vector<vector<unsigned int >> connectedVertices;
-	for (int i = 0; i < meshDataDOM.Size(); ++i) { // Loop through every mesh in scene
-		auto curMesh = meshDataDOM[i].GetObject();
-
-		// Calculate vertex number offset (based on how many meshes came before)
-		unsigned int vertexOffset = 0;
-		for (int j = 0; j < i; ++j) {
-			vertexOffset += meshDataDOM[j].GetObject().FindMember(
-				VERTICES)->value.GetArray().Size(); // Add on # of vertices that came before
-		}
-
-		// Loop through every face in mesh
-		for (auto &curMeshFaces : curMesh.FindMember(FACES)->value.GetArray()) {
-			auto curMeshFaceVertices = curMeshFaces.GetObject().FindMember(VERTICES)->value.GetArray();
-			for (int l = 0; l < curMeshFaceVertices.Size(); ++l) { // Loop through every vertex on face
-				if (l == curMeshFaceVertices.Size() - 1) { // Make sure to add closing connection
-					connectedVertices.push_back(
-						{vertexOffset + curMeshFaceVertices[0].GetUint(),
-						 vertexOffset + curMeshFaceVertices[l].GetUint()});
-				} else {
-					connectedVertices.push_back({vertexOffset + curMeshFaceVertices[l].GetUint(),
-					                             vertexOffset + curMeshFaceVertices[l + 1].GetUint()});
-				}
-			}
-		}
-	}
+	vector<vector<unsigned int>> connectedVertices = Drawings::extractConnectedVerticesCPU(meshDataDOM);
 
 	/// Draw edges between vertices
-	for (auto &connection : connectedVertices) {
-		// Get vertices
-		float tar[] = {screenCoordinates[connection[0] * 3],
-		               screenCoordinates[connection[0] * 3 + 1],
-		               screenCoordinates[connection[0] * 3 + 2]};
-		float src[] = {screenCoordinates[connection[1] * 3],
-		               screenCoordinates[connection[1] * 3 + 1],
-		               screenCoordinates[connection[1] * 3 + 2]};
-
-		// Skip if was also skipped during conversion (left as -1 in conversion)
-		if (tar[0] == -1 || src[0] == -1) {
-			cout << "Skipping divide by 0" << endl;
-			continue;
-		}
-
-		// get direction vector
-		float dirX = tar[0] - src[0];
-		float dirY = tar[1] - src[1];
-
-		// calculate normalized vector
-		float mag = sqrt(dirX * dirX + dirY * dirY);
-		if (mag == 0) { // skip if the points have no delta
-			continue;
-		}
-		float normX = dirX / mag;
-		float normY = dirY / mag;
-
-		// draw points while moving along
-		float drawX = src[0];
-		float drawY = src[1];
-
-		// keep track of how far you have left
-		int drawXDelta;
-		int drawYDelta;
-
-		do {
-			drawX += normX;
-			drawY += normY;
-			drawXDelta = (int) round(abs(tar[0] - drawX));
-			drawYDelta = (int) round(abs(tar[1] - drawY));
-
-			if (drawX > screenWidth || drawX < 0 || drawY > screenHeight ||
-			    drawY < 0) {
-				break;
-			}
-			drawDot(drawX, drawY, pixData, screenWidth);
-		} while (drawXDelta >= 3 || drawYDelta >= 3);
-	}
+	Drawings::drawWireframeCPU(screenWidth, screenHeight, pixData, screenCoordinates, connectedVertices);
 
 
 	//// SECTION: Convert and send data

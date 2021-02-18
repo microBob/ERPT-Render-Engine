@@ -9,7 +9,6 @@
 #include "kernels.cuh"
 #include "cublas_v2.h"
 
-#include <iostream>
 #include <cassert>
 
 
@@ -33,6 +32,7 @@ public:
 		cublasCreate(&handle);
 	}
 
+	// Perspective projection
 	void
 	set_worldToPerspectiveMatrix(float locX, float locY, float locZ, float rotX, float rotY, float rotZ,
 	                             float fov, float screenRatio, float zNear, float zFar);
@@ -42,6 +42,10 @@ public:
 	void convertPerspectiveToScreenSpace(float *input, const int vertexCount, float screenWidth,
 	                                     float screenHeight, unsigned int blocks, unsigned int threads, float *output);
 
+	static void convertPerspectiveToScreenSpaceCPU(float screenWidth, float screenHeight, int sceneVertexCount,
+	                                               const float *perspectiveVertices, float *screenCoordinates);
+
+	// Cleanup
 	void cleanup() {
 		free(worldToPerspectiveMatrix);
 
