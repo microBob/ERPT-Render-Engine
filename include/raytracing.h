@@ -14,5 +14,14 @@
 class Raytracing{
 public:
 	static void initOptix();
+	void createContext();
+
+protected:
+	// Context and stream for OptiX to run on
+	CUcontext cudaContext;
+	CUstream cudaStream;
+
+	// OptiX context and pipeline
+	OptixDeviceContext optixDeviceContext;
 };
 #endif //ERPT_RENDER_ENGINE_RAYTRACING_H

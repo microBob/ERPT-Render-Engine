@@ -22,7 +22,10 @@ extern "C" int main() {
 
 	//// SECTION: Initialize OptiX
 	try {
+		Raytracing raytracing{};
+
 		Raytracing::initOptix();
+		raytracing.createContext();
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);

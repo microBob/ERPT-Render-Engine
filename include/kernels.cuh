@@ -7,6 +7,7 @@
 
 //// SECTION: Includes
 #include <iostream>
+#include <cassert>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 

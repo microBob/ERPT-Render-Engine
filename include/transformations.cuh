@@ -9,8 +9,6 @@
 #include "kernels.cuh"
 #include "cublas_v2.h"
 
-#include <cassert>
-
 
 //// SECTION: Class definition
 class Transformations {
