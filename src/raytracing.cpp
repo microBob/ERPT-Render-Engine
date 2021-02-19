@@ -6,6 +6,7 @@
 
 void Raytracing::initOptix() {
 	// Reset CUDA and check for GPUs
+	cudaSetDevice(k.get_gpuID());
 	cudaFree(nullptr);
 	int deviceCount;
 	cudaGetDeviceCount(&deviceCount);

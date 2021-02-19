@@ -18,7 +18,7 @@ public:
 
 protected:
 	// Context and stream for OptiX to run on
-	CUcontext cudaContext;
+	CUcontext cudaContext{0};
 	CUstream cudaStream;
 
 	// OptiX context and pipeline
