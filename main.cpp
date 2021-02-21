@@ -10,6 +10,7 @@ extern "C" int main() {
 	/// Class instances
 	Communication com;
 	Transformations transformations;
+	Raytracing raytracing{};
 
 	/// Major data variables
 	Document renderDataDOM;
@@ -22,10 +23,7 @@ extern "C" int main() {
 
 	//// SECTION: Initialize OptiX
 	try {
-		Raytracing raytracing{};
-
-		Raytracing::initOptix();
-		raytracing.createContext();
+		raytracing.initOptix();
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);
