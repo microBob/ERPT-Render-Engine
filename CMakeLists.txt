@@ -13,6 +13,8 @@ set(CMAKE_MODULE_PATH
 find_package(CUDA REQUIRED)
 find_package(OptiX REQUIRED VERSION 7.0)
 find_program(BIN2C bin2c)
+
+# Convert device program into PTX
 macro(cuda_compile_and_embed output_var cuda_file)
   set(c_var_name ${output_var})
   cuda_compile_ptx(ptx_files ${cuda_file})
@@ -26,7 +28,6 @@ macro(cuda_compile_and_embed output_var cuda_file)
   )
   set(${output_var} ${embedded_file})
 endmacro()
-# Convert device program into PTX
 cuda_compile_and_embed(embeddedPtxCode src/optixDevicePrograms.cu)
 
 # Add in code files
@@ -59,6 +60,7 @@ target_include_directories(
 	PRIVATE
 	include
 	${OptiX_INCLUDE}
+	${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
 target_link_libraries(
 	${PROJECT_NAME}
