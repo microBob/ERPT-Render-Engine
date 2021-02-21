@@ -13,6 +13,14 @@
 //// SECTION: Class definition
 class Raytracing{
 public:
-	static void initOptix();
+	void initOptix();
+
+private:
+	void createOptixContext();
+
+private:
+	// CUDA context and stream
+	CUcontext cudaContext;
+	CUstream cudaStream;
 };
 #endif //ERPT_RENDER_ENGINE_RAYTRACING_H

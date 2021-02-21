@@ -18,3 +18,7 @@ void Raytracing::initOptix() {
 		exit(2);
 	}
 }
+
+void Raytracing::createOptixContext() {
+	auto 
+}
