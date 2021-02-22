@@ -70,6 +70,7 @@ target_link_libraries(
 	${PROJECT_NAME}
 	PRIVATE
 	CUDA::cudart
+	CUDA::cuda_driver
 	CUDA::cublas
 )
 
@@ -94,5 +95,6 @@ target_link_libraries(
 	LABS
 	PRIVATE
 	CUDA::cudart
+	CUDA::cuda_driver
 	CUDA::cublas
 )

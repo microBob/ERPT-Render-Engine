@@ -10,6 +10,8 @@
 #include "optix.h"
 #include "optix_stubs.h"
 
+#include <cassert>
+
 //// SECTION: Class definition
 class Raytracing{
 public:
@@ -22,5 +24,8 @@ private:
 	// CUDA context and stream
 	CUcontext cudaContext;
 	CUstream cudaStream;
+
+	// OptiX Context
+	OptixDeviceContext optixDeviceContext;
 };
 #endif //ERPT_RENDER_ENGINE_RAYTRACING_H
