@@ -5,7 +5,8 @@
 #include "optix_function_table_definition.h"
 
 void Raytracing::initOptix() {
-	// Reset CUDA and check for GPUs
+	/// Initialize Optix library
+	// Reset and prep CUDA
 	cudaFree(nullptr);
 	int deviceCount;
 	cudaGetDeviceCount(&deviceCount);
@@ -13,61 +14,67 @@ void Raytracing::initOptix() {
 		throw runtime_error("[FATAL ERROR]: No CUDA capable devices found!");
 	}
 
-	// Call optixInit and check for errors
+	// Call optixInit
 	OptixResult init = optixInit();
 	if (init != OPTIX_SUCCESS) {
 		cerr << "Optix call `optixInit()` failed wit code " << init << " (line " << __LINE__ << ")" << endl;
 		exit(2);
 	}
 
-	// Create OptiX context from CUDA context
-	createContext();
+
+	/// Create Optix context
+	createOptixContext();
+
+
 }
 
 static void contextLogCb(unsigned int level, const char *tag, const char *message, void *) {
 	fprintf(stderr, "[%2d][%12s]: %s\n", (int) level, tag, message);
 }
 
-void Raytracing::createContext() {
-	// Create stream and context
+void Raytracing::createOptixContext() {
 	cudaSetDevice(k.get_gpuID());
 	cudaStreamCreate(&cudaStream);
-	CUresult getCudaContext = cuCtxGetCurrent(&cudaContext);
-	assert(getCudaContext == CUDA_SUCCESS);
 
-	// Link to OptiX
-	auto createOptixContext = optixDeviceContextCreate(cudaContext, nullptr, &optixDeviceContext);
-	assert(createOptixContext == OPTIX_SUCCESS);
-	createOptixContext = optixDeviceContextSetLogCallback(optixDeviceContext, contextLogCb, nullptr, 4);
-	assert(createOptixContext == OPTIX_SUCCESS);
+	auto getContext = cuCtxGetCurrent(&cudaContext);
+	assert(getContext == CUDA_SUCCESS);
+
+	auto createOptixDeviceContext = optixDeviceContextCreate(cudaContext, nullptr, &optixDeviceContext);
+	assert(createOptixDeviceContext == OPTIX_SUCCESS);
+	auto setOptixCallbackLogLevel = optixDeviceContextSetLogCallback(optixDeviceContext, contextLogCb, nullptr, 4);
+	assert(setOptixCallbackLogLevel == OPTIX_SUCCESS);
 }
 
 extern "C" char embeddedPtxCode[];
 
-void Raytracing::createModules() {
+void Raytracing::createOptixModule() {
+	// Module compile options
 	optixModuleCompileOptions.maxRegisterCount = 50;
-	optixModuleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT; // Optimization level
-	optixModuleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE; // No debug
+	optixModuleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
+	optixModuleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
 
-	optixPipelineCompileOptions = {};
+	// Pipeline compile options
 	optixPipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
 	optixPipelineCompileOptions.usesMotionBlur = false;
 	optixPipelineCompileOptions.numPayloadValues = 2;
 	optixPipelineCompileOptions.numAttributeValues = 2;
 	optixPipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
-	optixPipelineCompileOptions.pipelineLaunchParamsVariableName = "optixLaunchParams";
+	optixPipelineCompileOptions.pipelineLaunchParamsVariableName = "optixLaunchParameters";
 
+	// Pipeline linking options
 	optixPipelineLinkOptions.maxTraceDepth = 2;
 
-	const string ptxCode = embeddedPtxCode;
-
+	// Create module
+	string ptxCode = embeddedPtxCode;
 	char log[2048];
-	size_t sizeofLog = sizeof(log);
-	auto moduleCreate = optixModuleCreateFromPTX(optixDeviceContext, &optixModuleCompileOptions,
-	                                             &optixPipelineCompileOptions, ptxCode.c_str(), ptxCode.size(), log,
-	                                             &sizeofLog, &optixModule);
-	assert(moduleCreate == OPTIX_SUCCESS);
-	if (sizeofLog > 1) {
+	size_t logByteSize = sizeof(log);
+	auto createOptixModuleFromPTX = optixModuleCreateFromPTX(optixDeviceContext, &optixModuleCompileOptions,
+	                                                         &optixPipelineCompileOptions, ptxCode.c_str(),
+	                                                         ptxCode.size(),
+	                                                         log, &logByteSize, &optixModule);
+	assert(createOptixModuleFromPTX == OPTIX_SUCCESS);
+
+	if (logByteSize > 1) {
 		cout << log << endl;
 	}
 }

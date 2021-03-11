@@ -11,36 +11,37 @@
 #include "optix_stubs.h"
 #include <vector>
 
-using namespace std;
+#include <cassert>
 
 //// SECTION: Class definition
 class Raytracing {
-private:
-	// Context and stream for OptiX to run on
-	CUcontext cudaContext{0};
-	CUstream cudaStream;
-
-
-	// OptiX context and pipeline
-	OptixDeviceContext optixDeviceContext;
-
-	OptixPipeline optixPipeline;
-	OptixPipelineCompileOptions optixPipelineCompileOptions;
-	OptixPipelineLinkOptions optixPipelineLinkOptions;
-
-
-	// OptiX module and programs
-	OptixModule optixModule;
-	OptixModuleCompileOptions optixModuleCompileOptions;
-
 public:
-
 	void initOptix();
 
-private:
+protected:
+	void createOptixContext();
 
-	void createContext();
-	void createModules();
+	void createOptixModule();
+
+protected:
+	// CUDA context and stream
+	CUcontext cudaContext;
+	CUstream cudaStream;
+
+	// OptiX Context
+	OptixDeviceContext optixDeviceContext;
+
+	// OptiX Pipeline
+	OptixPipeline optixPipeline;
+	OptixPipelineCompileOptions optixPipelineCompileOptions = {};
+	OptixPipelineLinkOptions optixPipelineLinkOptions = {};
+
+	// OptiX Module
+	OptixModule optixModule;
+	OptixModuleCompileOptions optixModuleCompileOptions = {};
+
+	// Embedded PTX device code
+
 };
 
 #endif //ERPT_RENDER_ENGINE_RAYTRACING_H
