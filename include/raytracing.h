@@ -9,8 +9,8 @@
 #include "../include/kernels.cuh"
 #include "optix.h"
 #include "optix_stubs.h"
+#include "CUDABuffer.h"
 #include <vector>
-
 #include <cassert>
 
 //// SECTION: Class definition
@@ -22,6 +22,8 @@ protected:
 	void createOptixContext();
 
 	void createOptixModule();
+
+	void createRaygenPrograms();
 
 protected:
 	// CUDA context and stream
@@ -40,7 +42,14 @@ protected:
 	OptixModule optixModule;
 	OptixModuleCompileOptions optixModuleCompileOptions = {};
 
-	// Embedded PTX device code
+	/// Optix ProgramGroups and Shader Binding Table
+	vector<OptixProgramGroup> raygenProgramGroups;
+	CUDABuffer raygenRecordsBuffer;
+	vector<OptixProgramGroup> missProgramGroups;
+	CUDABuffer missRecordsBuffer;
+	vector<OptixProgramGroup> hitgroupProgramGroups;
+	CUDABuffer hitgroupRecordsBuffer;
+	OptixShaderBindingTable sbt = {};
 
 };
 

@@ -43,6 +43,7 @@ add_executable(
 	include/drawings.cuh src/drawings.cu
 	include/raytracing.h src/raytracing.cpp
 	include/optixLaunchParameters.h
+	include/CUDABuffer.h
 	${embeddedPtxCode}
 )
 add_executable(LABS labs/labs.cpp labs/another.h)

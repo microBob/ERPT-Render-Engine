@@ -22,9 +22,12 @@ void Raytracing::initOptix() {
 	}
 
 
-	/// Create Optix context
+	/// Setting up Optix pipeline
+	// Create system
 	createOptixContext();
-
+	createOptixModule();
+	// Create program groups
+	createRaygenPrograms();
 
 }
 
@@ -73,6 +76,30 @@ void Raytracing::createOptixModule() {
 	                                                         ptxCode.size(),
 	                                                         log, &logByteSize, &optixModule);
 	assert(createOptixModuleFromPTX == OPTIX_SUCCESS);
+
+	if (logByteSize > 1) {
+		cout << log << endl;
+	}
+}
+
+void Raytracing::createRaygenPrograms() {
+	// Set for 1 raygen program group
+	raygenProgramGroups.resize(1);
+
+	// Setup specifications for raygen program group
+	OptixProgramGroupOptions programGroupOptions = {};
+	OptixProgramGroupDesc programGroupDesc = {};
+	programGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+	programGroupDesc.raygen.module = optixModule;
+	programGroupDesc.raygen.entryFunctionName = "__raygen__renderFrame";
+
+	// Create raygen program group
+	char log[2048];
+	size_t logByteSize = sizeof(log);
+	auto createOptixRaygenProgramGroup = optixProgramGroupCreate(optixDeviceContext, &programGroupDesc, 1,
+	                                                             &programGroupOptions, log, &logByteSize,
+	                                                             &raygenProgramGroups[0]);
+	assert(createOptixRaygenProgramGroup == OPTIX_SUCCESS);
 
 	if (logByteSize > 1) {
 		cout << log << endl;
