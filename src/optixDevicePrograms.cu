@@ -15,3 +15,4 @@ extern "C" __global__ void __miss__radiance() {}
 
 // Hit program
 extern "C" __global__ void __closesthit__radiance() {}
+extern "C" __global__ void __anyhit__radiance() {}

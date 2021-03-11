@@ -28,6 +28,8 @@ void Raytracing::initOptix() {
 	createOptixModule();
 	// Create program groups
 	createRaygenPrograms();
+	createMissPrograms();
+	createHitgroupPrograms();
 
 }
 
@@ -84,7 +86,7 @@ void Raytracing::createOptixModule() {
 
 void Raytracing::createRaygenPrograms() {
 	// Set for 1 raygen program group
-	raygenProgramGroups.resize(1);
+	raygenProgramGroups.resize(numberOfProgramGroups);
 
 	// Setup specifications for raygen program group
 	OptixProgramGroupOptions programGroupOptions = {};
@@ -96,10 +98,63 @@ void Raytracing::createRaygenPrograms() {
 	// Create raygen program group
 	char log[2048];
 	size_t logByteSize = sizeof(log);
-	auto createOptixRaygenProgramGroup = optixProgramGroupCreate(optixDeviceContext, &programGroupDesc, 1,
+	auto createOptixRaygenProgramGroup = optixProgramGroupCreate(optixDeviceContext, &programGroupDesc,
+	                                                             numberOfProgramGroups,
 	                                                             &programGroupOptions, log, &logByteSize,
 	                                                             &raygenProgramGroups[0]);
 	assert(createOptixRaygenProgramGroup == OPTIX_SUCCESS);
+
+	if (logByteSize > 1) {
+		cout << log << endl;
+	}
+}
+
+void Raytracing::createMissPrograms() {
+	// Set for 1 miss program group
+	missProgramGroups.resize(numberOfProgramGroups);
+
+	// Setup specifications for miss program groups
+	OptixProgramGroupOptions programGroupOptions = {};
+	OptixProgramGroupDesc programGroupDesc = {};
+	programGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+	programGroupDesc.miss.module = optixModule;
+	programGroupDesc.miss.entryFunctionName = "__miss__radiance";
+
+	// Create miss program group
+	char log[2048];
+	size_t logByteSize = sizeof(log);
+	auto createOptixMissProgramGroup = optixProgramGroupCreate(optixDeviceContext, &programGroupDesc,
+	                                                           numberOfProgramGroups,
+	                                                           &programGroupOptions, log, &logByteSize,
+	                                                           &missProgramGroups[0]);
+	assert(createOptixMissProgramGroup == OPTIX_SUCCESS);
+
+	if (logByteSize > 1) {
+		cout << log << endl;
+	}
+}
+
+void Raytracing::createHitgroupPrograms() {
+	// Set for 1 miss program group
+	hitgroupProgramGroups.resize(numberOfProgramGroups);
+
+	// Setup specifications for miss program groups
+	OptixProgramGroupOptions programGroupOptions = {};
+	OptixProgramGroupDesc programGroupDesc = {};
+	programGroupDesc.kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+	programGroupDesc.hitgroup.moduleCH = optixModule; // CH = closest hit
+	programGroupDesc.hitgroup.entryFunctionNameCH = "__closesthit__radiance";
+	programGroupDesc.hitgroup.moduleAH = optixModule; // AH = any hit
+	programGroupDesc.hitgroup.entryFunctionNameAH = "__anyhit__radiance";
+
+	// Create miss program group
+	char log[2048];
+	size_t logByteSize = sizeof(log);
+	auto createOptixHitgroupProgramGroup = optixProgramGroupCreate(optixDeviceContext, &programGroupDesc,
+	                                                               numberOfProgramGroups,
+	                                                               &programGroupOptions, log, &logByteSize,
+	                                                               &hitgroupProgramGroups[0]);
+	assert(createOptixHitgroupProgramGroup == OPTIX_SUCCESS);
 
 	if (logByteSize > 1) {
 		cout << log << endl;

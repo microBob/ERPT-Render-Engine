@@ -19,11 +19,15 @@ public:
 	void initOptix();
 
 protected:
+	// OptiX base
 	void createOptixContext();
 
 	void createOptixModule();
 
+	// Program Groups
 	void createRaygenPrograms();
+	void createMissPrograms();
+	void createHitgroupPrograms();
 
 protected:
 	// CUDA context and stream
@@ -43,6 +47,7 @@ protected:
 	OptixModuleCompileOptions optixModuleCompileOptions = {};
 
 	/// Optix ProgramGroups and Shader Binding Table
+	short numberOfProgramGroups = 1;
 	vector<OptixProgramGroup> raygenProgramGroups;
 	CUDABuffer raygenRecordsBuffer;
 	vector<OptixProgramGroup> missProgramGroups;
