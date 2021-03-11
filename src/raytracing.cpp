@@ -44,3 +44,37 @@ void Raytracing::createOptixContext() {
 	auto setOptixCallbackLogLevel = optixDeviceContextSetLogCallback(optixDeviceContext, contextLogCb, nullptr, 4);
 	assert(setOptixCallbackLogLevel == OPTIX_SUCCESS);
 }
+
+extern "C" char embeddedPtxCode[];
+
+void Raytracing::createOptixModule() {
+	// Module compile options
+	optixModuleCompileOptions.maxRegisterCount = 50;
+	optixModuleCompileOptions.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
+	optixModuleCompileOptions.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+
+	// Pipeline compile options
+	optixPipelineCompileOptions.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
+	optixPipelineCompileOptions.usesMotionBlur = false;
+	optixPipelineCompileOptions.numPayloadValues = 2;
+	optixPipelineCompileOptions.numAttributeValues = 2;
+	optixPipelineCompileOptions.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
+	optixPipelineCompileOptions.pipelineLaunchParamsVariableName = "optixLaunchParameters";
+
+	// Pipeline linking options
+	optixPipelineLinkOptions.maxTraceDepth = 2;
+
+	// Create module
+	string ptxCode = embeddedPtxCode;
+	char log[2048];
+	size_t logByteSize = sizeof(log);
+	auto createOptixModuleFromPTX = optixModuleCreateFromPTX(optixDeviceContext, &optixModuleCompileOptions,
+	                                                         &optixPipelineCompileOptions, ptxCode.c_str(),
+	                                                         ptxCode.size(),
+	                                                         log, &logByteSize, &optixModule);
+	assert(createOptixModuleFromPTX == OPTIX_SUCCESS);
+
+	if (logByteSize > 1) {
+		cout << log << endl;
+	}
+}

@@ -13,19 +13,34 @@
 #include <cassert>
 
 //// SECTION: Class definition
-class Raytracing{
+class Raytracing {
 public:
 	void initOptix();
 
-private:
+protected:
 	void createOptixContext();
 
-private:
+	void createOptixModule();
+
+protected:
 	// CUDA context and stream
 	CUcontext cudaContext;
 	CUstream cudaStream;
 
 	// OptiX Context
 	OptixDeviceContext optixDeviceContext;
+
+	// OptiX Pipeline
+	OptixPipeline optixPipeline;
+	OptixPipelineCompileOptions optixPipelineCompileOptions = {};
+	OptixPipelineLinkOptions optixPipelineLinkOptions = {};
+
+	// OptiX Module
+	OptixModule optixModule;
+	OptixModuleCompileOptions optixModuleCompileOptions = {};
+
+	// Embedded PTX device code
+
 };
+
 #endif //ERPT_RENDER_ENGINE_RAYTRACING_H

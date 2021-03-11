@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(ERPT_Render_Engine CUDA CXX)
+project(ERPT_Render_Engine CUDA CXX C)
 
 set(CMAKE_CXX_STANDARD 14)
 
