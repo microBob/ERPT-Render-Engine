@@ -13,6 +13,7 @@ set(CMAKE_MODULE_PATH
 find_package(CUDAToolkit REQUIRED)
 find_package(CUDA REQUIRED) # To compile ptx code
 find_package(OptiX REQUIRED VERSION 7.0)
+include_directories(${OptiX_INCLUDE}) # Needed general include for ptx compile
 find_program(BIN2C bin2c)
 
 # OptiX device program compile
@@ -67,12 +68,11 @@ target_include_directories(
 	PRIVATE
 	include
 	${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
-	${OptiX_INCLUDE}
-	${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
 )
 target_link_libraries(
 	${PROJECT_NAME}
 	PRIVATE
+	${optix_LIBRARY}
 	CUDA::cudart
 	CUDA::cuda_driver
 	CUDA::cublas

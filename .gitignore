@@ -229,3 +229,5 @@ CTestTestfile.cmake
 _deps
 
 labs/
+
+ignore_folder/

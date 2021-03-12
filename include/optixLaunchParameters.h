@@ -8,8 +8,9 @@
 struct OptixLaunchParameters {
 	// vec2i fbSize;
 	// uint32_t *colorBuffer
-	int fbSize;
-	int *fbPixels;
+	int frameID{0};
+	int frameBufferSize{};
+	int *frameColorBuffer{};
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H
