@@ -29,6 +29,9 @@ protected:
 	void createMissPrograms();
 	void createHitgroupPrograms();
 
+	// Pipeline and SBT
+	void createOptiXPipeline();
+
 protected:
 	// CUDA context and stream
 	CUcontext cudaContext;

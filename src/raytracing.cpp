@@ -30,6 +30,8 @@ void Raytracing::initOptix() {
 	createRaygenPrograms();
 	createMissPrograms();
 	createHitgroupPrograms();
+	// Create Pipeline and SBT
+	createOptiXPipeline();
 
 }
 
@@ -78,7 +80,6 @@ void Raytracing::createOptixModule() {
 	                                                         ptxCode.size(),
 	                                                         log, &logByteSize, &optixModule);
 	assert(createOptixModuleFromPTX == OPTIX_SUCCESS);
-
 	if (logByteSize > 1) {
 		cout << log << endl;
 	}
@@ -103,7 +104,6 @@ void Raytracing::createRaygenPrograms() {
 	                                                             &programGroupOptions, log, &logByteSize,
 	                                                             &raygenProgramGroups[0]);
 	assert(createOptixRaygenProgramGroup == OPTIX_SUCCESS);
-
 	if (logByteSize > 1) {
 		cout << log << endl;
 	}
@@ -128,7 +128,6 @@ void Raytracing::createMissPrograms() {
 	                                                           &programGroupOptions, log, &logByteSize,
 	                                                           &missProgramGroups[0]);
 	assert(createOptixMissProgramGroup == OPTIX_SUCCESS);
-
 	if (logByteSize > 1) {
 		cout << log << endl;
 	}
@@ -155,7 +154,44 @@ void Raytracing::createHitgroupPrograms() {
 	                                                               &programGroupOptions, log, &logByteSize,
 	                                                               &hitgroupProgramGroups[0]);
 	assert(createOptixHitgroupProgramGroup == OPTIX_SUCCESS);
+	if (logByteSize > 1) {
+		cout << log << endl;
+	}
+}
 
+void Raytracing::createOptiXPipeline() {
+	// Compile program groups together
+	vector<OptixProgramGroup> optixProgramGroups;
+	for (auto raygenProgramGroup : raygenProgramGroups) {
+		optixProgramGroups.push_back(raygenProgramGroup);
+	}
+	for (auto missProgramGroup : missProgramGroups) {
+		optixProgramGroups.push_back(missProgramGroup);
+	}
+	for (auto hitgroupProgramGroup : hitgroupProgramGroups) {
+		optixProgramGroups.push_back(hitgroupProgramGroup);
+	}
+
+	// Create Pipeline
+	char log[2048];
+	size_t logByteSize = sizeof(log);
+	auto createOptixPipeline = optixPipelineCreate(optixDeviceContext, &optixPipelineCompileOptions,
+	                                               &optixPipelineLinkOptions,
+	                                               optixProgramGroups.data(), (int) optixProgramGroups.size(), log,
+	                                               &logByteSize,
+	                                               &optixPipeline);
+	assert(createOptixPipeline == OPTIX_SUCCESS);
+	if (logByteSize > 1) {
+		cout << log << endl;
+	}
+
+	// Set pipeline stack size
+	auto setOptixPipelineStackSize = optixPipelineSetStackSize(optixPipeline,
+	                                                           2 * 1024,
+	                                                           2 * 1024,
+	                                                           2 * 1024,
+	                                                           1);
+	assert(setOptixPipelineStackSize == OPTIX_SUCCESS);
 	if (logByteSize > 1) {
 		cout << log << endl;
 	}
