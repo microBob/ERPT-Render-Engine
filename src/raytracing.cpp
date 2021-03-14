@@ -32,11 +32,12 @@ void Raytracing::initOptix() {
 	createHitgroupPrograms();
 	// Create Pipeline and SBT
 	createOptiXPipeline();
+	createShaderBindingTable();
 
 }
 
 static void contextLogCb(unsigned int level, const char *tag, const char *message, void *) {
-	fprintf(stderr, "[%2d][%12s]: %s\n", (int) level, tag, message);
+	fprintf(stderr, "[%2d][%12s]: %s\n", static_cast<int>(level), tag, message);
 }
 
 void Raytracing::createOptixContext() {
@@ -177,7 +178,8 @@ void Raytracing::createOptiXPipeline() {
 	size_t logByteSize = sizeof(log);
 	auto createOptixPipeline = optixPipelineCreate(optixDeviceContext, &optixPipelineCompileOptions,
 	                                               &optixPipelineLinkOptions,
-	                                               optixProgramGroups.data(), (int) optixProgramGroups.size(), log,
+	                                               optixProgramGroups.data(),
+	                                               static_cast<int>(optixProgramGroups.size()), log,
 	                                               &logByteSize,
 	                                               &optixPipeline);
 	assert(createOptixPipeline == OPTIX_SUCCESS);
@@ -195,4 +197,48 @@ void Raytracing::createOptiXPipeline() {
 	if (logByteSize > 1) {
 		cout << log << endl;
 	}
+}
+
+void Raytracing::createShaderBindingTable() {
+	// Raygen records
+	vector<RaygenRecord> raygenRecords;
+	for (auto raygenProgramGroup : raygenProgramGroups) {
+		RaygenRecord record{};
+		auto optixSBTRecordPackHeader = optixSbtRecordPackHeader(raygenProgramGroup, &record);
+		assert(optixSBTRecordPackHeader == OPTIX_SUCCESS);
+		record.data = nullptr; // temporary
+		raygenRecords.push_back(record);
+	}
+	raygenRecordsBuffer.alloc_and_upload(raygenRecords);
+	shaderBindingTable.raygenRecord = raygenRecordsBuffer.d_pointer();
+
+	// Miss records
+	vector<MissRecord> missRecords;
+	for (auto missProgramGroup : missProgramGroups) {
+		MissRecord record{};
+		auto optixSBTRecordPackHeader = optixSbtRecordPackHeader(missProgramGroup, &record);
+		assert(optixSBTRecordPackHeader == OPTIX_SUCCESS);
+		record.data = nullptr; // temp
+		missRecords.push_back(record);
+	}
+	missRecordsBuffer.alloc_and_upload(missRecords);
+	shaderBindingTable.missRecordBase = missRecordsBuffer.d_pointer();
+	shaderBindingTable.missRecordStrideInBytes = sizeof(MissRecord);
+	shaderBindingTable.missRecordCount = static_cast<int>(missRecords.size());
+
+	// Hitgroup records
+	int numberOfObjects = 1; // TODO: make this reflect actual number of objects
+	vector<HitgroupRecord> hitgroupRecords;
+	for (int i = 0; i < numberOfObjects; ++i) {
+		int objectType = 0;
+		HitgroupRecord record{};
+		auto optixSBTRecordPackHeader = optixSbtRecordPackHeader(hitgroupProgramGroups[objectType], &record);
+		assert(optixSBTRecordPackHeader == OPTIX_SUCCESS);
+		record.objectID = i;
+		hitgroupRecords.push_back(record);
+	}
+	hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
+	shaderBindingTable.hitgroupRecordBase = hitgroupRecordsBuffer.d_pointer();
+	shaderBindingTable.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
+	shaderBindingTable.hitgroupRecordCount = static_cast<int>(hitgroupRecords.size());
 }

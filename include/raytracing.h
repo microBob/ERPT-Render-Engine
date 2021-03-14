@@ -26,11 +26,15 @@ protected:
 
 	// Program Groups
 	void createRaygenPrograms();
+
 	void createMissPrograms();
+
 	void createHitgroupPrograms();
 
 	// Pipeline and SBT
 	void createOptiXPipeline();
+
+	void createShaderBindingTable();
 
 protected:
 	// CUDA context and stream
@@ -57,8 +61,23 @@ protected:
 	CUDABuffer missRecordsBuffer;
 	vector<OptixProgramGroup> hitgroupProgramGroups;
 	CUDABuffer hitgroupRecordsBuffer;
-	OptixShaderBindingTable sbt = {};
+	OptixShaderBindingTable shaderBindingTable = {};
 
 };
+
+//// SECTION: Shader binding table structs
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) RaygenRecord {
+	__align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+	void *data; // dummy variable
+};
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) MissRecord {
+	__align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+	void *data; // dummy variable
+};
+struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) HitgroupRecord {
+	__align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
+	int objectID; // dummy variable
+};
+
 
 #endif //ERPT_RENDER_ENGINE_RAYTRACING_H
