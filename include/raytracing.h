@@ -23,6 +23,8 @@ public:
 
 	void optixRender();
 
+	void downloadRender(float *pixData);
+
 protected:
 	// OptiX base
 	void createOptixContext();

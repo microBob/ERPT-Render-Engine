@@ -271,3 +271,18 @@ void Raytracing::optixRender() {
 		exit(2);
 	}
 }
+
+void Raytracing::downloadRender(float *pixData) {
+	unsigned int numberOfPixels = optixLaunchParameters.frameBufferSize.x * optixLaunchParameters.frameBufferSize.y;
+	// Copy back rendered pixels as colorVectors
+	auto *renderedPixelVectors = static_cast<colorVector *>(malloc(numberOfPixels * sizeof(colorVector)));
+	frameColorBuffer.download(renderedPixelVectors, numberOfPixels);
+
+	// Copy data into pixData
+	for (int i = 0; i < numberOfPixels; ++i) {
+		pixData[i * 4] = renderedPixelVectors[i].r;
+		pixData[i * 4 + 1] = renderedPixelVectors[i].g;
+		pixData[i * 4 + 2] = renderedPixelVectors[i].b;
+		pixData[i * 4 + 3] = renderedPixelVectors[i].a;
+	}
+}

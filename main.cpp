@@ -151,14 +151,15 @@ extern "C" int main() {
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 
 	/// Extract connected vertices
-	vector<vector<unsigned int>> connectedVertices = Drawings::extractConnectedVerticesCPU(meshDataDOM);
+//	vector<vector<unsigned int>> connectedVertices = Drawings::extractConnectedVerticesCPU(meshDataDOM);
 
 	/// Draw edges between vertices
-	Drawings::drawWireframeCPU(screenWidth, screenHeight, pixData, screenCoordinates, connectedVertices);
+//	Drawings::drawWireframeCPU(screenWidth, screenHeight, pixData, screenCoordinates, connectedVertices);
 
 
 	//// SECTION: OptiX render
 	raytracing.optixRender();
+	raytracing.downloadRender(pixData);
 
 
 	//// SECTION: Convert and send data
