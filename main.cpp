@@ -10,6 +10,7 @@ extern "C" int main() {
 	/// Class instances
 	Communication com;
 	Transformations transformations;
+	Raytracing raytracing{};
 
 	/// Major data variables
 	Document renderDataDOM;
@@ -22,7 +23,7 @@ extern "C" int main() {
 
 	//// SECTION: Initialize OptiX
 	try {
-		Raytracing::initOptix();
+		raytracing.initOptix();
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);
@@ -39,7 +40,8 @@ extern "C" int main() {
 	auto sceneDataDOM = renderDataDOM.FindMember(SCENE)->value.GetObject();
 
 
-	//// SECTION: Setup pixData
+	//// SECTION: Setup pixData and OptiX frame buffer
+	/// pixData
 	float *pixData;
 
 	// Extract resolution
@@ -60,6 +62,10 @@ extern "C" int main() {
 			pixData[i] = 0;
 		}
 	}
+
+	/// Frame buffer
+	vector2 frameBufferSize = {static_cast<int>(screenWidth), static_cast<int>(screenHeight)};
+	raytracing.setFrameSize(frameBufferSize);
 
 
 	//// SECTION: Convert Data to screen space
@@ -137,6 +143,7 @@ extern "C" int main() {
 
 	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
 
+
 	//// SECTION: Draw Wireframe
 	/// Switch screenCoordinates to CPU
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_cpuID());
@@ -144,10 +151,15 @@ extern "C" int main() {
 	cudaMemPrefetchAsync(screenCoordinates, screenCoordinatesByteSize, k.get_cpuID());
 
 	/// Extract connected vertices
-	vector<vector<unsigned int>> connectedVertices = Drawings::extractConnectedVerticesCPU(meshDataDOM);
+//	vector<vector<unsigned int>> connectedVertices = Drawings::extractConnectedVerticesCPU(meshDataDOM);
 
 	/// Draw edges between vertices
-	Drawings::drawWireframeCPU(screenWidth, screenHeight, pixData, screenCoordinates, connectedVertices);
+//	Drawings::drawWireframeCPU(screenWidth, screenHeight, pixData, screenCoordinates, connectedVertices);
+
+
+	//// SECTION: OptiX render
+	raytracing.optixRender();
+	raytracing.downloadRender(pixData);
 
 
 	//// SECTION: Convert and send data

@@ -12,6 +12,7 @@
 #include <vector>
 #include <chrono>
 #include "constants.h"
+#include "types.h"
 /// RapidJSON
 #include "rapidjson/document.h"
 
