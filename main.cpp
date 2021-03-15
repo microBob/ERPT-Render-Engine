@@ -40,7 +40,8 @@ extern "C" int main() {
 	auto sceneDataDOM = renderDataDOM.FindMember(SCENE)->value.GetObject();
 
 
-	//// SECTION: Setup pixData
+	//// SECTION: Setup pixData and OptiX frame buffer
+	/// pixData
 	float *pixData;
 
 	// Extract resolution
@@ -61,6 +62,10 @@ extern "C" int main() {
 			pixData[i] = 0;
 		}
 	}
+
+	/// Frame buffer
+	vector2 frameBufferSize = {static_cast<int>(screenWidth), static_cast<int>(screenHeight)};
+	raytracing.setFrameSize(frameBufferSize);
 
 
 	//// SECTION: Convert Data to screen space

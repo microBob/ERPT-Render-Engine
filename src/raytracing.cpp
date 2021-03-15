@@ -242,3 +242,30 @@ void Raytracing::createShaderBindingTable() {
 	shaderBindingTable.hitgroupRecordStrideInBytes = sizeof(HitgroupRecord);
 	shaderBindingTable.hitgroupRecordCount = static_cast<int>(hitgroupRecords.size());
 }
+
+void Raytracing::setFrameSize(const vector2 &newSize) {
+	// Update cuda frame buffer
+	frameColorBuffer.resize(newSize.x * newSize.y * sizeof(colorVector));
+
+	// Update launch parameters
+	optixLaunchParameters.frameBufferSize = newSize;
+	optixLaunchParameters.frameColorBuffer = static_cast<colorVector *>(frameColorBuffer.d_ptr);
+}
+
+void Raytracing::optixRender() {
+	optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
+	optixLaunchParameters.frameID++;
+
+	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
+	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
+	                                  optixLaunchParameters.frameBufferSize.x, optixLaunchParameters.frameBufferSize.y,
+	                                  1);
+	assert(launchingOptix == OPTIX_SUCCESS);
+
+	cudaDeviceSynchronize();
+	cudaError_t error = cudaGetLastError();
+	if (error != cudaSuccess) {
+		fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
+		exit(2);
+	}
+}

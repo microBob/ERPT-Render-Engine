@@ -5,11 +5,10 @@
 #include "optix_device.h"
 
 // Launch Parameters
-extern "C" __constant__ OptixLaunchParameters launchParameters;
+extern "C" __constant__ OptixLaunchParameters optixLaunchParameters;
 
 // Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
-
 }
 
 // Miss program

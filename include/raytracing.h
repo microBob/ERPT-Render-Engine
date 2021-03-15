@@ -10,6 +10,7 @@
 #include "optix.h"
 #include "optix_stubs.h"
 #include "CUDABuffer.h"
+#include "optixLaunchParameters.h"
 #include <vector>
 #include <cassert>
 
@@ -17,6 +18,10 @@
 class Raytracing {
 public:
 	void initOptix();
+
+	void setFrameSize(const vector2 &newSize);
+
+	void optixRender();
 
 protected:
 	// OptiX base
@@ -36,7 +41,7 @@ protected:
 
 	void createShaderBindingTable();
 
-protected:
+protected: // OptiX base
 	// CUDA context and stream
 	CUcontext cudaContext;
 	CUstream cudaStream;
@@ -62,6 +67,11 @@ protected:
 	vector<OptixProgramGroup> hitgroupProgramGroups;
 	CUDABuffer hitgroupRecordsBuffer;
 	OptixShaderBindingTable shaderBindingTable = {};
+
+protected: // Launch and rendering
+	OptixLaunchParameters optixLaunchParameters;
+	CUDABuffer optixLaunchParametersBuffer;
+	CUDABuffer frameColorBuffer;
 
 };
 

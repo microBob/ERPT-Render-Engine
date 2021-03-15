@@ -46,7 +46,7 @@ add_executable(
 	include/optixLaunchParameters.h
 	include/CUDABuffer.h
 	${embeddedPtxCode}
-)
+	include/types.h)
 add_executable(LABS labs/labs.cpp labs/another.h)
 
 # For project
