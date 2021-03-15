@@ -143,6 +143,7 @@ extern "C" int main() {
 
 	cudaFree(perspectiveVertices); // Get rid of perspectiveVertices after convert to screen
 
+
 	//// SECTION: Draw Wireframe
 	/// Switch screenCoordinates to CPU
 	cudaMemAdvise(screenCoordinates, screenCoordinatesByteSize, cudaMemAdviseSetPreferredLocation, k.get_cpuID());
@@ -154,6 +155,10 @@ extern "C" int main() {
 
 	/// Draw edges between vertices
 	Drawings::drawWireframeCPU(screenWidth, screenHeight, pixData, screenCoordinates, connectedVertices);
+
+
+	//// SECTION: OptiX render
+	raytracing.optixRender();
 
 
 	//// SECTION: Convert and send data

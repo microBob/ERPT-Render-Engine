@@ -34,6 +34,8 @@ void Raytracing::initOptix() {
 	createOptiXPipeline();
 	createShaderBindingTable();
 
+	optixLaunchParametersBuffer.alloc(sizeof(optixLaunchParameters));
+
 }
 
 static void contextLogCb(unsigned int level, const char *tag, const char *message, void *) {
