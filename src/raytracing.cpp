@@ -250,17 +250,16 @@ void Raytracing::setFrameSize(const vector2 &newSize) {
 	frameColorBuffer.resize(newSize.x * newSize.y * sizeof(colorVector));
 
 	// Update launch parameters
-	optixLaunchParameters.frameBufferSize = newSize;
-	optixLaunchParameters.frameColorBuffer = static_cast<colorVector *>(frameColorBuffer.d_ptr);
+	optixLaunchParameters.frame.frameBufferSize = newSize;
+	optixLaunchParameters.frame.frameColorBuffer = static_cast<colorVector *>(frameColorBuffer.d_ptr);
 }
 
 void Raytracing::optixRender() {
 	optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
-	optixLaunchParameters.frameID++;
 
 	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
 	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-	                                  optixLaunchParameters.frameBufferSize.x, optixLaunchParameters.frameBufferSize.y,
+	                                  optixLaunchParameters.frame.frameBufferSize.x, optixLaunchParameters.frame.frameBufferSize.y,
 	                                  1);
 	assert(launchingOptix == OPTIX_SUCCESS);
 
@@ -273,7 +272,7 @@ void Raytracing::optixRender() {
 }
 
 void Raytracing::downloadRender(float *pixData) {
-	unsigned int numberOfPixels = optixLaunchParameters.frameBufferSize.x * optixLaunchParameters.frameBufferSize.y;
+	unsigned int numberOfPixels = optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y;
 	// Copy back rendered pixels as colorVectors
 	auto *renderedPixelVectors = static_cast<colorVector *>(malloc(numberOfPixels * sizeof(colorVector)));
 	frameColorBuffer.download(renderedPixelVectors, numberOfPixels);
