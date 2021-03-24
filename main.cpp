@@ -64,7 +64,7 @@ extern "C" int main() {
 	}
 
 	/// Frame buffer
-	vector2 frameBufferSize = {static_cast<int>(screenWidth), static_cast<int>(screenHeight)};
+	vector2i frameBufferSize = {static_cast<int>(screenWidth), static_cast<int>(screenHeight)};
 	raytracing.setFrameSize(frameBufferSize);
 
 

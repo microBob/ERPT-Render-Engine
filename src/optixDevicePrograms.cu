@@ -31,17 +31,52 @@ static __forceinline__ __device__ T *getPerRayData() {
 
 // Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
-	// Create test pattern
+	// Get index and camera
 	const unsigned int ix = optixGetLaunchIndex().x;
 	const unsigned int iy = optixGetLaunchIndex().y;
+	const auto &camera = optixLaunchParameters.camera;
 
-	const float r = static_cast<float>(ix % 256) / 255.0f;
-	const float g = static_cast<float>(iy % 256) / 255.0f;
-	const float b = static_cast<float>((ix + iy) % 256) / 255.0f;
+	// Create per ray data pointer
+	colorVector pixelColorPerRayData{};
+	uint32_t payload0, payload1;
+	packPointer(&pixelColorPerRayData, payload0, payload1);
 
-	const colorVector pixelColor = {r, g, b};
+	// Generate ray direction from screen
+	const vector2f screen = {
+		(static_cast<float>(ix) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
+		(static_cast<float>(iy) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y)
+	};
+	vector2f screenMinus = {screen.x - 0.5f, screen.y - 0.5f};
+	vector3 rawRayDirection = {
+		camera.direction.x + screenMinus.x * camera.horizontal.x + screenMinus.y * camera.vertical.x,
+		camera.direction.y + screenMinus.x * camera.horizontal.y + screenMinus.y * camera.vertical.y,
+		camera.direction.z + screenMinus.x * camera.horizontal.z + screenMinus.y * camera.vertical.z
+	};
+	float rawRayMagnitude = sqrt(pow(rawRayDirection.x, 2) +
+	                             pow(rawRayDirection.y, 2) +
+	                             pow(rawRayDirection.z, 2));
+	vector3 rayDirectionNormalized = {
+		rawRayDirection.x / rawRayMagnitude,
+		rawRayDirection.y / rawRayMagnitude,
+		rawRayDirection.z / rawRayMagnitude
+	};
+
+	// Optix Trace
+	optixTrace(optixLaunchParameters.optixTraversableHandle,
+	           camera.position,
+	           rayDirectionNormalized,
+	           0.f,    // tmin
+	           1e20f,  // tmax
+	           0.0f,   // rayTime
+	           OptixVisibilityMask(255),
+	           OPTIX_RAY_FLAG_DISABLE_ANYHIT,//OPTIX_RAY_FLAG_NONE,
+	           0,             // SBT offset
+	           1,               // SBT stride
+	           0,             // missSBTIndex
+	           payload0, payload1);
+
 	const unsigned int colorBufferIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
-	optixLaunchParameters.frame.frameColorBuffer[colorBufferIndex] = pixelColor;
+	optixLaunchParameters.frame.frameColorBuffer[colorBufferIndex] = pixelColorPerRayData;
 }
 
 // Miss program

@@ -12,7 +12,7 @@
 struct OptixLaunchParameters {
 	struct {
 		colorVector *frameColorBuffer{};
-		vector2 frameBufferSize{};
+		vector2i frameBufferSize{};
 	} frame;
 
 	struct {
