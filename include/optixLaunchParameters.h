@@ -5,18 +5,18 @@
 #ifndef ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H
 #define ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H
 
-#include "optix.h"
+//#include "optix.h"
 #include "optix_stubs.h"
 #include "types.h"
 
 struct OptixLaunchParameters {
 	struct {
 		colorVector *frameColorBuffer{};
-		vector2i frameBufferSize{};
+		int2 frameBufferSize{};
 	} frame;
 
 	struct {
-		vector3 position, direction, horizontal, vertical;
+		float3 position, direction, horizontal, vertical;
 	} camera{};
 
 	OptixTraversableHandle optixTraversableHandle{};

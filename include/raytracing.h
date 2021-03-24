@@ -19,7 +19,7 @@ class Raytracing {
 public:
 	void initOptix();
 
-	void setFrameSize(const vector2i &newSize);
+	void setFrameSize(const int2 &newSize);
 
 	void optixRender();
 

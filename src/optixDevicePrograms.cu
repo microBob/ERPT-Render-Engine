@@ -42,37 +42,34 @@ extern "C" __global__ void __raygen__renderFrame() {
 	packPointer(&pixelColorPerRayData, payload0, payload1);
 
 	// Generate ray direction from screen
-	const vector2f screen = {
+	const auto screen = make_float2(
 		(static_cast<float>(ix) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-		(static_cast<float>(iy) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y)
-	};
-	vector2f screenMinus = {screen.x - 0.5f, screen.y - 0.5f};
-	vector3 rawRayDirection = {
+		(static_cast<float>(iy) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+	float2 screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
+	auto rawRayDirection = make_float3(
 		camera.direction.x + screenMinus.x * camera.horizontal.x + screenMinus.y * camera.vertical.x,
 		camera.direction.y + screenMinus.x * camera.horizontal.y + screenMinus.y * camera.vertical.y,
 		camera.direction.z + screenMinus.x * camera.horizontal.z + screenMinus.y * camera.vertical.z
-	};
+	);
 	float rawRayMagnitude = sqrt(pow(rawRayDirection.x, 2) +
 	                             pow(rawRayDirection.y, 2) +
 	                             pow(rawRayDirection.z, 2));
-	vector3 rayDirectionNormalized = {
-		rawRayDirection.x / rawRayMagnitude,
-		rawRayDirection.y / rawRayMagnitude,
-		rawRayDirection.z / rawRayMagnitude
-	};
+	auto rayDirectionNormalized = make_float3(rawRayDirection.x / rawRayMagnitude,
+	                                          rawRayDirection.y / rawRayMagnitude,
+	                                          rawRayDirection.z / rawRayMagnitude);
 
 	// Optix Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
 	           camera.position,
 	           rayDirectionNormalized,
-	           0.f,    // tmin
-	           1e20f,  // tmax
-	           0.0f,   // rayTime
+	           0.f,
+	           1e20f,
+	           0.0f,
 	           OptixVisibilityMask(255),
-	           OPTIX_RAY_FLAG_DISABLE_ANYHIT,//OPTIX_RAY_FLAG_NONE,
-	           0,             // SBT offset
-	           1,               // SBT stride
-	           0,             // missSBTIndex
+	           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+	           0,
+	           1,
+	           0,
 	           payload0, payload1);
 
 	const unsigned int colorBufferIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;

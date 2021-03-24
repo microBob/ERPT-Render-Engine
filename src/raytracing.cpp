@@ -245,7 +245,7 @@ void Raytracing::createShaderBindingTable() {
 	shaderBindingTable.hitgroupRecordCount = static_cast<int>(hitgroupRecords.size());
 }
 
-void Raytracing::setFrameSize(const vector2i &newSize) {
+void Raytracing::setFrameSize(const int2 &newSize) {
 	// Update cuda frame buffer
 	frameColorBuffer.resize(newSize.x * newSize.y * sizeof(colorVector));
 
