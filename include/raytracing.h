@@ -14,16 +14,30 @@
 #include <vector>
 #include <cassert>
 
+
+//// SECTION: Structs
+struct Camera {
+	float3 from; // Camera position
+	float3 at; // Point camera is looking at
+	float3 up; // Global up vector
+};
+struct TriangleMesh {
+	vector<float3> vertices;
+	vector<float3> indices;
+};
+
 //// SECTION: Class definition
 class Raytracing {
 public:
-	void initOptix();
+	void initOptix(const TriangleMesh &triangleMesh);
 
 	void setFrameSize(const int2 &newSize);
 
 	void optixRender();
 
 	void downloadRender(float *pixData);
+
+	void setCamera(const Camera &camera, const float fov);
 
 protected:
 	// OptiX base
@@ -42,6 +56,14 @@ protected:
 	void createOptiXPipeline();
 
 	void createShaderBindingTable();
+
+	// Acceleration structure
+	OptixTraversableHandle buildAccelerationStructure(const TriangleMesh &triangleMesh);
+
+private:
+	static float3 normalizedVector(float3 vector);
+
+	static float3 vectorCrossProduct(float3 vectorA, float3 vectorB);
 
 protected: // OptiX base
 	// CUDA context and stream
@@ -74,6 +96,15 @@ protected: // Launch and rendering
 	OptixLaunchParameters optixLaunchParameters;
 	CUDABuffer optixLaunchParametersBuffer;
 	CUDABuffer frameColorBuffer;
+
+protected:
+	Camera lastSetCamera; // Camera used for rendering
+
+	const TriangleMesh mesh; // Mesh definition
+	CUDABuffer vertexBuffer;
+	CUDABuffer indexBuffer;
+
+	CUDABuffer accelerationStructureBuffer; // Compressed mesh definition
 
 };
 

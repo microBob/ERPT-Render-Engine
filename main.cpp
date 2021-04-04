@@ -10,7 +10,7 @@ extern "C" int main() {
 	/// Class instances
 	Communication com;
 	Transformations transformations;
-	Raytracing raytracing{};
+	Raytracing raytracing;
 
 	/// Major data variables
 	Document renderDataDOM;
@@ -19,15 +19,6 @@ extern "C" int main() {
 	size_t sceneVerticesByteSize;
 
 	float screenWidth, screenHeight;
-
-
-	//// SECTION: Initialize OptiX
-	try {
-		raytracing.initOptix();
-	} catch (runtime_error &error) {
-		cout << error.what() << endl;
-		exit(1);
-	}
 
 
 	//// SECTION: Connect to addon and read in data
@@ -63,9 +54,23 @@ extern "C" int main() {
 		}
 	}
 
-	/// Frame buffer
-	int2 frameBufferSize = {static_cast<int>(screenWidth), static_cast<int>(screenHeight)};
-	raytracing.setFrameSize(frameBufferSize);
+
+
+	//// SECTION: Initialize OptiX
+	try {
+		TriangleMesh triangleMesh;
+		/// Launch Parameters
+		// Frame size
+		int2 frameBufferSize = {static_cast<int>(screenWidth), static_cast<int>(screenHeight)};
+		raytracing.setFrameSize(frameBufferSize);
+
+		// Init OptiX
+		raytracing.initOptix(triangleMesh);
+
+	} catch (runtime_error &error) {
+		cout << error.what() << endl;
+		exit(1);
+	}
 
 
 	//// SECTION: Convert Data to screen space

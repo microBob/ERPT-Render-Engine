@@ -51,6 +51,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 		camera.direction.y + screenMinus.x * camera.horizontal.y + screenMinus.y * camera.vertical.y,
 		camera.direction.z + screenMinus.x * camera.horizontal.z + screenMinus.y * camera.vertical.z
 	);
+	// TODO: can be faster with inverse square root https://www.youtube.com/watch?v=p8u_k2LIZyo
 	float rawRayMagnitude = sqrt(pow(rawRayDirection.x, 2) +
 	                             pow(rawRayDirection.y, 2) +
 	                             pow(rawRayDirection.z, 2));

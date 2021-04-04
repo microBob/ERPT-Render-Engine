@@ -4,7 +4,7 @@
 #include "../include/raytracing.h"
 #include "optix_function_table_definition.h"
 
-void Raytracing::initOptix() {
+void Raytracing::initOptix(const TriangleMesh &triangleMesh) {
 	/// Initialize Optix library
 	// Reset and prep CUDA
 	cudaFree(nullptr);
@@ -30,6 +30,7 @@ void Raytracing::initOptix() {
 	createRaygenPrograms();
 	createMissPrograms();
 	createHitgroupPrograms();
+	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(triangleMesh);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -259,7 +260,8 @@ void Raytracing::optixRender() {
 
 	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
 	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-	                                  optixLaunchParameters.frame.frameBufferSize.x, optixLaunchParameters.frame.frameBufferSize.y,
+	                                  optixLaunchParameters.frame.frameBufferSize.x,
+	                                  optixLaunchParameters.frame.frameBufferSize.y,
 	                                  1);
 	assert(launchingOptix == OPTIX_SUCCESS);
 
@@ -272,7 +274,8 @@ void Raytracing::optixRender() {
 }
 
 void Raytracing::downloadRender(float *pixData) {
-	unsigned int numberOfPixels = optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y;
+	unsigned int numberOfPixels =
+		optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y;
 	// Copy back rendered pixels as colorVectors
 	auto *renderedPixelVectors = static_cast<colorVector *>(malloc(numberOfPixels * sizeof(colorVector)));
 	frameColorBuffer.download(renderedPixelVectors, numberOfPixels);
@@ -284,4 +287,42 @@ void Raytracing::downloadRender(float *pixData) {
 		pixData[i * 4 + 2] = renderedPixelVectors[i].b;
 		pixData[i * 4 + 3] = renderedPixelVectors[i].a;
 	}
+}
+
+void Raytracing::setCamera(const Camera &camera, const float fov) {
+	lastSetCamera = camera;
+	optixLaunchParameters.camera.position = camera.from;
+	float3 lookingVector = make_float3(camera.at.x - camera.from.x, camera.at.y - camera.from.y,
+	                                   camera.at.z - camera.from.z);
+	optixLaunchParameters.camera.direction = normalizedVector(lookingVector);
+
+	const float aspectRatioFov = static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) /
+	                             static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * fov;
+
+	float3 normalizedHorizontalCross = normalizedVector(
+		vectorCrossProduct(optixLaunchParameters.camera.direction, camera.up));
+	float3 normalizedVerticalCross = normalizedVector(
+		vectorCrossProduct(optixLaunchParameters.camera.horizontal, optixLaunchParameters.camera.direction));
+	optixLaunchParameters.camera.horizontal = make_float3(aspectRatioFov * normalizedHorizontalCross.x,
+	                                                      aspectRatioFov * normalizedHorizontalCross.y,
+	                                                      aspectRatioFov * normalizedHorizontalCross.z);
+	optixLaunchParameters.camera.vertical = make_float3(fov * normalizedVerticalCross.x,
+	                                                    fov * normalizedVerticalCross.y,
+	                                                    fov * normalizedVerticalCross.z);
+
+}
+
+OptixTraversableHandle Raytracing::buildAccelerationStructure(const TriangleMesh &triangleMesh) {
+	return 0;
+}
+
+float3 Raytracing::normalizedVector(float3 vector) {
+	auto magnitude = static_cast<float>(sqrt(pow(vector.x, 2) + pow(vector.y, 2) + pow(vector.z, 2)));
+
+	return make_float3(vector.x / magnitude, vector.y / magnitude, vector.z / magnitude);
+}
+
+float3 Raytracing::vectorCrossProduct(float3 vectorA, float3 vectorB) {
+	return make_float3(vectorA.y * vectorB.z - vectorA.z * vectorB.y, vectorA.z * vectorB.x - vectorA.x * vectorB.z,
+	                   vectorA.x * vectorB.y - vectorA.y * vectorB.x);
 }
