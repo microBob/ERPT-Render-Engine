@@ -23,13 +23,13 @@ struct Camera {
 };
 struct TriangleMesh {
 	vector<float3> vertices;
-	vector<float3> indices;
+	vector<int3> indices;
 };
 
 //// SECTION: Class definition
 class Raytracing {
 public:
-	void initOptix(const TriangleMesh &triangleMesh);
+	void initOptix(TriangleMesh &newMesh);
 
 	void setFrameSize(const int2 &newSize);
 
@@ -58,7 +58,7 @@ protected:
 	void createShaderBindingTable();
 
 	// Acceleration structure
-	OptixTraversableHandle buildAccelerationStructure(const TriangleMesh &triangleMesh);
+	OptixTraversableHandle buildAccelerationStructure();
 
 private:
 	static float3 normalizedVector(float3 vector);
@@ -100,11 +100,11 @@ protected: // Launch and rendering
 protected:
 	Camera lastSetCamera; // Camera used for rendering
 
-	const TriangleMesh mesh; // Mesh definition
+	TriangleMesh triangleMesh; // Mesh definition
 	CUDABuffer vertexBuffer;
 	CUDABuffer indexBuffer;
 
-	CUDABuffer accelerationStructureBuffer; // Compressed mesh definition
+	CUDABuffer accelerationStructureBuffer; // Compressed triangleMesh definition
 
 };
 

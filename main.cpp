@@ -89,13 +89,13 @@ extern "C" int main() {
 	                                             cameraClipping[0].GetFloat(),
 	                                             cameraClipping[1].GetFloat());
 
-	/// Decompose mesh data into vertices
+	/// Decompose triangleMesh data into vertices
 	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetArray();
 	vector<float> rawVertices; // Utilize vector because of unknown vertices count
 
-	// Loop through every mesh in data
+	// Loop through every triangleMesh in data
 	for (auto &mesh : meshDataDOM) {
-		auto meshVertices = mesh.FindMember(VERTICES)->value.GetArray(); // Get vertices from mesh
+		auto meshVertices = mesh.FindMember(VERTICES)->value.GetArray(); // Get vertices from triangleMesh
 		for (auto &vertex : meshVertices) { // Loop through each vertex
 			for (auto &coordinates : vertex.GetArray()) { // Loop through XYZ of vertex
 				rawVertices.push_back(coordinates.GetFloat());
