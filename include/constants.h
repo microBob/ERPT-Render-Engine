@@ -11,6 +11,7 @@ constexpr char RESOLUTION[] = "RESOLUTION";
 
 constexpr char MESHES[] = "MESHES";
 constexpr char VERTICES[] = "VERTICES";
+constexpr char INDICES[] = "INDICES";
 constexpr char FACES[] = "FACES";
 constexpr char NORMAL[] = "NORMAL";
 

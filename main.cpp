@@ -18,7 +18,7 @@ extern "C" int main() {
 	float *sceneVertices;
 	size_t sceneVerticesByteSize;
 
-	float screenWidth, screenHeight;
+	unsigned int screenWidth, screenHeight;
 
 
 	//// SECTION: Connect to addon and read in data
@@ -38,8 +38,8 @@ extern "C" int main() {
 	// Extract resolution
 	auto resolutionData = renderDataDOM.FindMember(RESOLUTION)->value.GetArray();
 
-	screenWidth = resolutionData[0].GetFloat();
-	screenHeight = resolutionData[1].GetFloat();
+	screenWidth = resolutionData[0].GetUint();
+	screenHeight = resolutionData[1].GetUint();
 
 	size_t pixDataByteSize = screenWidth * screenHeight * 4 * sizeof(float);
 
@@ -57,10 +57,23 @@ extern "C" int main() {
 
 
 	//// SECTION: Setup OptiX
-	/// Read Scene
+	/// Translate scene data
+	// Mesh
 	TriangleMesh triangleMesh;
+	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetObject();
+	for (auto &curVertex : meshDataDOM.FindMember(VERTICES)->value.GetArray()) {
+		auto vertexArray = curVertex.GetArray();
+		triangleMesh.vertices.push_back(
+			make_float3(vertexArray[0].GetFloat(), vertexArray[1].GetFloat(),
+			            vertexArray[2].GetFloat()));
+	}
+	for (auto &curFace : meshDataDOM.FindMember(INDICES)->value.GetArray()) {
+		auto indexArray = curFace.GetArray();
+		triangleMesh.indices.push_back(
+			make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
+	}
 
-	// Setup camera
+	// Camera
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
 	auto cameraLocation = cameraDataDOM.FindMember(LOCATION)->value.GetArray();
 	auto cameraDirection = cameraDataDOM.FindMember(DIRECTION)->value.GetArray();
@@ -70,19 +83,18 @@ extern "C" int main() {
 	Camera camera = {
 		make_float3(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(), cameraLocation[2].GetFloat()),
 		make_float3(cameraDirection[0].GetFloat(), cameraDirection[1].GetFloat(), cameraDirection[2].GetFloat()),
-		make_float3(cameraUp[0].GetFloat(), cameraUp[1].GetFloat(), cameraUp[2].GetFloat())
+		make_float3(cameraUp[0].GetFloat(), cameraUp[1].GetFloat(), cameraUp[2].GetFloat()),
+		cameraFov
 	};
+	raytracing.setCamera(camera);
 
+	// Screen / frame buffer size
+	uint2 frameBufferSize = {screenWidth, screenHeight};
+	raytracing.setFrameSize(frameBufferSize);
+
+	/// Init OptiX
 	try {
-
-		/// Launch Parameters
-		// Frame size
-		int2 frameBufferSize = {static_cast<int>(screenWidth), static_cast<int>(screenHeight)};
-		raytracing.setFrameSize(frameBufferSize);
-
-		// Init OptiX
 		raytracing.initOptix(triangleMesh);
-
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);

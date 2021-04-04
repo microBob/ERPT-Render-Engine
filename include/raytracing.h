@@ -18,12 +18,13 @@
 //// SECTION: Structs
 struct Camera {
 	float3 from; // Camera position
-	float3 at; // Point camera is looking at
-	float3 up; // Global up vector
+	float3 at; // Point camera is looking at (direction)
+	float3 up; // Up vector
+	float fov;
 };
 struct TriangleMesh {
 	vector<float3> vertices;
-	vector<int3> indices;
+	vector<uint3> indices;
 };
 
 //// SECTION: Class definition
@@ -31,13 +32,13 @@ class Raytracing {
 public:
 	void initOptix(TriangleMesh &newMesh);
 
-	void setFrameSize(const int2 &newSize);
+	void setFrameSize(const uint2 &newSize);
 
 	void optixRender();
 
 	void downloadRender(float *pixData);
 
-	void setCamera(const Camera &camera, const float fov);
+	void setCamera(const Camera &camera);
 
 protected:
 	// OptiX base

@@ -249,7 +249,7 @@ void Raytracing::createShaderBindingTable() {
 	shaderBindingTable.hitgroupRecordCount = static_cast<int>(hitgroupRecords.size());
 }
 
-void Raytracing::setFrameSize(const int2 &newSize) {
+void Raytracing::setFrameSize(const uint2 &newSize) {
 	// Update cuda frame buffer
 	frameColorBuffer.resize(newSize.x * newSize.y * sizeof(colorVector));
 
@@ -292,7 +292,7 @@ void Raytracing::downloadRender(float *pixData) {
 	}
 }
 
-void Raytracing::setCamera(const Camera &camera, const float fov) {
+void Raytracing::setCamera(const Camera &camera) {
 	lastSetCamera = camera;
 	optixLaunchParameters.camera.position = camera.from;
 	float3 lookingVector = make_float3(camera.at.x - camera.from.x, camera.at.y - camera.from.y,
@@ -300,7 +300,7 @@ void Raytracing::setCamera(const Camera &camera, const float fov) {
 	optixLaunchParameters.camera.direction = normalizedVector(lookingVector);
 
 	const float aspectRatioFov = static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) /
-	                             static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * fov;
+	                             static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * camera.fov;
 
 	float3 normalizedHorizontalCross = normalizedVector(
 		vectorCrossProduct(optixLaunchParameters.camera.direction, camera.up));
@@ -309,9 +309,9 @@ void Raytracing::setCamera(const Camera &camera, const float fov) {
 	optixLaunchParameters.camera.horizontal = make_float3(aspectRatioFov * normalizedHorizontalCross.x,
 	                                                      aspectRatioFov * normalizedHorizontalCross.y,
 	                                                      aspectRatioFov * normalizedHorizontalCross.z);
-	optixLaunchParameters.camera.vertical = make_float3(fov * normalizedVerticalCross.x,
-	                                                    fov * normalizedVerticalCross.y,
-	                                                    fov * normalizedVerticalCross.z);
+	optixLaunchParameters.camera.vertical = make_float3(camera.fov * normalizedVerticalCross.x,
+	                                                    camera.fov * normalizedVerticalCross.y,
+	                                                    camera.fov * normalizedVerticalCross.z);
 
 }
 
@@ -336,7 +336,7 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure() {
 	triangleInput.triangleArray.vertexBuffers = &deviceVertices;
 
 	triangleInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-	triangleInput.triangleArray.indexStrideInBytes = sizeof(int3);
+	triangleInput.triangleArray.indexStrideInBytes = sizeof(uint3);
 	triangleInput.triangleArray.numIndexTriplets = triangleMesh.indices.size();
 	triangleInput.triangleArray.indexBuffer = deviceIndices;
 
