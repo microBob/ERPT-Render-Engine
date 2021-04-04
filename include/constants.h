@@ -23,6 +23,7 @@ constexpr char ENERGY[] = "ENERGY";
 
 constexpr char CAMERA[] = "CAMERA";
 constexpr char DIRECTION[] = "DIRECTION";
+constexpr char UP[] = "UP";
 constexpr char FOV[] = "FOV";
 constexpr char CLIP[] = "CLIP";
 
