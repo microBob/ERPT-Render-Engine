@@ -295,24 +295,21 @@ void Raytracing::downloadRender(float *pixData) {
 void Raytracing::setCamera(const Camera &camera) {
 	lastSetCamera = camera;
 	optixLaunchParameters.camera.position = camera.from;
-	float3 lookingVector = make_float3(camera.at.x - camera.from.x, camera.at.y - camera.from.y,
-	                                   camera.at.z - camera.from.z);
-	optixLaunchParameters.camera.direction = normalizedVector(lookingVector);
+	optixLaunchParameters.camera.direction = camera.direction;
 
 	const float aspectRatioFov = static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) /
 	                             static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * camera.fov;
 
 	float3 normalizedHorizontalCross = normalizedVector(
 		vectorCrossProduct(optixLaunchParameters.camera.direction, camera.up));
-	float3 normalizedVerticalCross = normalizedVector(
-		vectorCrossProduct(optixLaunchParameters.camera.horizontal, optixLaunchParameters.camera.direction));
 	optixLaunchParameters.camera.horizontal = make_float3(aspectRatioFov * normalizedHorizontalCross.x,
 	                                                      aspectRatioFov * normalizedHorizontalCross.y,
 	                                                      aspectRatioFov * normalizedHorizontalCross.z);
+	float3 normalizedVerticalCross = normalizedVector(
+		vectorCrossProduct(optixLaunchParameters.camera.horizontal, optixLaunchParameters.camera.direction));
 	optixLaunchParameters.camera.vertical = make_float3(camera.fov * normalizedVerticalCross.x,
 	                                                    camera.fov * normalizedVerticalCross.y,
 	                                                    camera.fov * normalizedVerticalCross.z);
-
 }
 
 OptixTraversableHandle Raytracing::buildAccelerationStructure() {

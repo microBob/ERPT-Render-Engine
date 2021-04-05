@@ -18,7 +18,7 @@
 //// SECTION: Structs
 struct Camera {
 	float3 from; // Camera position
-	float3 at; // Point camera is looking at (direction)
+	float3 direction; // Point camera is looking direction
 	float3 up; // Up vector
 	float fov;
 };

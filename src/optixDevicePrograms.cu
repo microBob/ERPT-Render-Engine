@@ -37,7 +37,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const auto &camera = optixLaunchParameters.camera;
 
 	// Create per ray data pointer
-	colorVector pixelColorPerRayData{};
+	colorVector pixelColorPerRayData = {0, 0, 0, 1};
 	uint32_t payload0, payload1;
 	packPointer(&pixelColorPerRayData, payload0, payload1);
 
@@ -45,12 +45,15 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const auto screen = make_float2(
 		(static_cast<float>(ix) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
 		(static_cast<float>(iy) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
-	float2 screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
-	auto rawRayDirection = make_float3(
-		camera.direction.x + screenMinus.x * camera.horizontal.x + screenMinus.y * camera.vertical.x,
-		camera.direction.y + screenMinus.x * camera.horizontal.y + screenMinus.y * camera.vertical.y,
-		camera.direction.z + screenMinus.x * camera.horizontal.z + screenMinus.y * camera.vertical.z
-	);
+	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
+	auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
+	                                              screenMinus.x * camera.horizontal.y,
+	                                              screenMinus.x * camera.horizontal.z);
+	auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x, screenMinus.y * camera.vertical.y,
+	                                            screenMinus.y * camera.vertical.z);
+	auto rawRayDirection = make_float3(camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
+	                                   camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
+	                                   camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
 	// TODO: can be faster with inverse square root https://www.youtube.com/watch?v=p8u_k2LIZyo
 	float rawRayMagnitude = sqrt(pow(rawRayDirection.x, 2) +
 	                             pow(rawRayDirection.y, 2) +
@@ -80,15 +83,13 @@ extern "C" __global__ void __raygen__renderFrame() {
 // Miss program
 extern "C" __global__ void __miss__radiance() {
 	colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
-	perRayData = {0, 0, 0}; // Set to black
+	perRayData = {1, 1, 1}; // Set to white
 }
 
 // Hit program
 extern "C" __global__ void __closesthit__radiance() {
-	const unsigned int primitiveIdx = optixGetPrimitiveIndex();
 	colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
-	float shade = static_cast<float>(primitiveIdx % 256) / 255.0f;
-	perRayData = {shade, shade, shade}; // Some shade of grey
+	perRayData = {0, 0, 0};
 }
 extern "C" __global__ void __anyhit__radiance() {}
 
