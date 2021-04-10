@@ -14,10 +14,6 @@ extern "C" int main() {
 
 	/// Major data variables
 	Document renderDataDOM;
-
-	float *sceneVertices;
-	size_t sceneVerticesByteSize;
-
 	unsigned int screenWidth, screenHeight;
 
 
@@ -27,6 +23,8 @@ extern "C" int main() {
 	}
 
 	renderDataDOM = com.ReceiveData();
+
+	return 0;
 	// Get scene data and verify existence
 	auto sceneDataDOM = renderDataDOM.FindMember(SCENE)->value.GetObject();
 
@@ -45,21 +43,12 @@ extern "C" int main() {
 
 	cudaMallocManaged(&pixData, pixDataByteSize);
 	cudaMemPrefetchAsync(pixData, pixDataByteSize, k.get_cpuID());
-//	fill_n(pixData, pixDataByteSize, 0);
-	for (int i = 0; i < pixDataByteSize / sizeof(float); ++i) { // Fill pixData with a black screen
-		if ((i + 1) % 4 == 0) { // Set alpha to 1
-			pixData[i] = 1;
-		} else { // Set everything else to 0
-			pixData[i] = 0;
-		}
-	}
-
 
 
 	//// SECTION: Setup OptiX
 	/// Translate scene data
-	// Mesh
 	TriangleMesh triangleMesh;
+	// Mesh Vertices
 	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetObject();
 	for (auto &curVertex : meshDataDOM.FindMember(VERTICES)->value.GetArray()) {
 		auto vertexArray = curVertex.GetArray();
@@ -67,13 +56,14 @@ extern "C" int main() {
 			make_float3(vertexArray[0].GetFloat(), vertexArray[1].GetFloat(),
 			            vertexArray[2].GetFloat()));
 	}
+	// Face Indices
 	for (auto &curFace : meshDataDOM.FindMember(INDICES)->value.GetArray()) {
 		auto indexArray = curFace.GetArray();
 		triangleMesh.indices.push_back(
 			make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
 	}
 
-	// Camera
+	/// Camera
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
 	auto cameraLocation = cameraDataDOM.FindMember(LOCATION)->value.GetArray();
 	auto cameraDirection = cameraDataDOM.FindMember(DIRECTION)->value.GetArray();
@@ -88,7 +78,7 @@ extern "C" int main() {
 	};
 	raytracing.setCamera(camera);
 
-	// Screen / frame buffer size
+	/// Screen / frame buffer size
 	uint2 frameBufferSize = {screenWidth, screenHeight};
 	raytracing.setFrameSize(frameBufferSize);
 
