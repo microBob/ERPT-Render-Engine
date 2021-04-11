@@ -59,7 +59,7 @@ protected:
 	void createShaderBindingTable();
 
 	// Acceleration structure
-	OptixTraversableHandle buildAccelerationStructure();
+	OptixTraversableHandle buildAccelerationStructure(TriangleMesh &triMesh);
 
 private:
 	static float3 normalizedVector(float3 vector);

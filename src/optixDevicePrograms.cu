@@ -9,6 +9,11 @@
 // Launch Parameters
 extern "C" __constant__ OptixLaunchParameters optixLaunchParameters;
 
+enum {
+	SURFACE_RAY_TYPE = 0,
+	RAY_TYPE_COUNT
+};
+
 // Payload management
 static __forceinline__ __device__ void *unpackPointer(uint32_t i0, uint32_t i1) {
 	const uint64_t rawPointer = static_cast<uint64_t>(i0) << 32 | i1;
@@ -37,7 +42,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const auto &camera = optixLaunchParameters.camera;
 
 	// Create per ray data pointer
-	colorVector pixelColorPerRayData = {0, 0, 0, 1};
+	colorVector pixelColorPerRayData = {0, 0, 0};
 	uint32_t payload0, payload1;
 	packPointer(&pixelColorPerRayData, payload0, payload1);
 
@@ -71,9 +76,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 	           0.0f,
 	           OptixVisibilityMask(255),
 	           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-	           0,
-	           1,
-	           0,
+	           SURFACE_RAY_TYPE,
+	           RAY_TYPE_COUNT,
+	           SURFACE_RAY_TYPE,
 	           payload0, payload1);
 
 	const unsigned int colorBufferIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;

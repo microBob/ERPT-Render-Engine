@@ -6,8 +6,11 @@
 #define ERPT_RENDER_ENGINE_TYPES_H
 
 struct colorVector {
-	float r, g, b;
-	float a = 1; // Default to have alpha be 1
+	// Default to a black pixel with full alpha
+	float r = 0;
+	float g = 0;
+	float b = 0;
+	float a = 1;
 };
 
 #endif //ERPT_RENDER_ENGINE_TYPES_H

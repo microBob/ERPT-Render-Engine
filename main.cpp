@@ -24,7 +24,6 @@ extern "C" int main() {
 
 	renderDataDOM = com.ReceiveData();
 
-	return 0;
 	// Get scene data and verify existence
 	auto sceneDataDOM = renderDataDOM.FindMember(SCENE)->value.GetObject();
 
@@ -70,10 +69,16 @@ extern "C" int main() {
 	auto cameraUp = cameraDataDOM.FindMember(UP)->value.GetArray();
 	auto cameraFov = cameraDataDOM.FindMember(FOV)->value.GetFloat();
 
+//	Camera camera = {
+//		make_float3(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(), cameraLocation[2].GetFloat()),
+//		make_float3(cameraDirection[0].GetFloat(), cameraDirection[1].GetFloat(), cameraDirection[2].GetFloat()),
+//		make_float3(cameraUp[0].GetFloat(), cameraUp[1].GetFloat(), cameraUp[2].GetFloat()),
+//		cameraFov
+//	};
 	Camera camera = {
-		make_float3(cameraLocation[0].GetFloat(), cameraLocation[1].GetFloat(), cameraLocation[2].GetFloat()),
-		make_float3(cameraDirection[0].GetFloat(), cameraDirection[1].GetFloat(), cameraDirection[2].GetFloat()),
-		make_float3(cameraUp[0].GetFloat(), cameraUp[1].GetFloat(), cameraUp[2].GetFloat()),
+		make_float3(0, 0, 10),
+		make_float3(0,0,-1),
+		make_float3(0,1,0),
 		cameraFov
 	};
 	raytracing.setCamera(camera);

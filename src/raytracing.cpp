@@ -33,7 +33,7 @@ void Raytracing::initOptix(TriangleMesh &newMesh) {
 	createHitgroupPrograms();
 	// Create Acceleration Structure
 	triangleMesh = newMesh;
-	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure();
+	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(newMesh);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -312,12 +312,12 @@ void Raytracing::setCamera(const Camera &camera) {
 	                                                    camera.fov * normalizedVerticalCross.z);
 }
 
-OptixTraversableHandle Raytracing::buildAccelerationStructure() {
+OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triMesh) {
 	// Upload model to GPU
-	vertexBuffer.alloc_and_upload(triangleMesh.vertices);
-	indexBuffer.alloc_and_upload(triangleMesh.indices);
+	vertexBuffer.alloc_and_upload(triMesh.vertices);
+	indexBuffer.alloc_and_upload(triMesh.indices);
 
-	OptixTraversableHandle accelerationStructureHandle;
+	OptixTraversableHandle accelerationStructureHandle{0};
 
 	/// Triangle Inputs
 	OptixBuildInput triangleInput = {};
@@ -329,12 +329,12 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure() {
 
 	triangleInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
 	triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-	triangleInput.triangleArray.numVertices = triangleMesh.vertices.size();
+	triangleInput.triangleArray.numVertices = static_cast<int>(triMesh.vertices.size());
 	triangleInput.triangleArray.vertexBuffers = &deviceVertices;
 
 	triangleInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
 	triangleInput.triangleArray.indexStrideInBytes = sizeof(uint3);
-	triangleInput.triangleArray.numIndexTriplets = triangleMesh.indices.size();
+	triangleInput.triangleArray.numIndexTriplets = static_cast<int>(triMesh.indices.size());
 	triangleInput.triangleArray.indexBuffer = deviceIndices;
 
 	uint32_t triangleInputFlags[1] = {0};
