@@ -297,8 +297,8 @@ void Raytracing::setCamera(const Camera &camera) {
 	optixLaunchParameters.camera.position = camera.from;
 	optixLaunchParameters.camera.direction = camera.direction;
 
-	const float aspectRatioFov = static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) /
-	                             static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * camera.fov;
+	const float aspectRatioFov = camera.cosFovY * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) /
+	                             static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y);
 
 	float3 normalizedHorizontalCross = normalizedVector(
 		vectorCrossProduct(optixLaunchParameters.camera.direction, camera.up));
@@ -307,9 +307,9 @@ void Raytracing::setCamera(const Camera &camera) {
 	                                                      aspectRatioFov * normalizedHorizontalCross.z);
 	float3 normalizedVerticalCross = normalizedVector(
 		vectorCrossProduct(optixLaunchParameters.camera.horizontal, optixLaunchParameters.camera.direction));
-	optixLaunchParameters.camera.vertical = make_float3(camera.fov * normalizedVerticalCross.x,
-	                                                    camera.fov * normalizedVerticalCross.y,
-	                                                    camera.fov * normalizedVerticalCross.z);
+	optixLaunchParameters.camera.vertical = make_float3(camera.cosFovY * normalizedVerticalCross.x,
+	                                                    camera.cosFovY * normalizedVerticalCross.y,
+	                                                    camera.cosFovY * normalizedVerticalCross.z);
 }
 
 OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triMesh) {

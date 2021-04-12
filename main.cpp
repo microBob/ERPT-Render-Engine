@@ -79,6 +79,7 @@ extern "C" int main() {
 		make_float3(cameraUp[0].GetFloat(), cameraUp[1].GetFloat(), cameraUp[2].GetFloat()),
 		cameraFov
 	};
+	cout << "Camera FOV:\t" << camera.cosFovY << endl;
 	raytracing.setCamera(camera);
 
 	/// Init OptiX

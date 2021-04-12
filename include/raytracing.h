@@ -20,7 +20,7 @@ struct Camera {
 	float3 from; // Camera position
 	float3 direction; // Point camera is looking direction
 	float3 up; // Up vector
-	float fov;
+	float cosFovY;
 };
 struct TriangleMesh {
 	vector<float3> vertices;
