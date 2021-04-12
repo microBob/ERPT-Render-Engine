@@ -67,6 +67,19 @@ extern "C" __global__ void __raygen__renderFrame() {
 	                                          rawRayDirection.y / rawRayMagnitude,
 	                                          rawRayDirection.z / rawRayMagnitude);
 
+	if (ix == static_cast<unsigned int>(optixGetLaunchDimensions().x / 2) &&
+	    iy == static_cast<unsigned int>(optixGetLaunchDimensions().y / 2)) {
+		printf("ix, iy:\t%u, %u\n", ix, iy);
+		printf("screen:\t%f, %f\n", screen.x, screen.y);
+		printf("screenMinus:\t%f, %f\n", screenMinus.x, screenMinus.y);
+		printf("horizontalTimesScreenMinus:\t%f, %f, %f\n", horizontalTimesScreenMinus.x, horizontalTimesScreenMinus.y,
+		       horizontalTimesScreenMinus.z);
+		printf("verticalTimesScreenMinus:\t%f, %f, %f\n", verticalTimesScreenMinus.x, verticalTimesScreenMinus.y, verticalTimesScreenMinus.z);
+		printf("rawRayDirection:\t%f, %f, %f\n", rawRayDirection.x, rawRayDirection.y, rawRayDirection.z);
+		printf("rawRayMagnitude:\t%f\n", rawRayMagnitude);
+		printf("rayDirectionNormalized:\t%f, %f, %f\n", rayDirectionNormalized.x, rayDirectionNormalized.y, rayDirectionNormalized.z);
+	}
+
 	// Optix Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
 	           camera.position,

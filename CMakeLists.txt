@@ -56,13 +56,7 @@ set_target_properties(
 	PROPERTIES
 	CUDA_SEPARABLE_COMPILATION ON
 )
-target_compile_options(
-	${PROJECT_NAME}
-	PRIVATE
-	$<$<COMPILE_LANGUAGE:CUDA>:
-	-arch=sm_61
-	-gencode arch=compute_52,code=sm_52>
-)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CUDA_ARCHITECTURES 52 61)
 target_include_directories(
 	${PROJECT_NAME}
 	PRIVATE
