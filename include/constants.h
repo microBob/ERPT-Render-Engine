@@ -11,6 +11,7 @@ constexpr char RESOLUTION[] = "RESOLUTION";
 
 constexpr char MESHES[] = "MESHES";
 constexpr char VERTICES[] = "VERTICES";
+constexpr char INDICES[] = "INDICES";
 constexpr char FACES[] = "FACES";
 constexpr char NORMAL[] = "NORMAL";
 
@@ -23,6 +24,7 @@ constexpr char ENERGY[] = "ENERGY";
 
 constexpr char CAMERA[] = "CAMERA";
 constexpr char DIRECTION[] = "DIRECTION";
+constexpr char UP[] = "UP";
 constexpr char FOV[] = "FOV";
 constexpr char CLIP[] = "CLIP";
 
