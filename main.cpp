@@ -65,6 +65,8 @@ extern "C" int main() {
 		triangleMesh.indices.push_back(
 			make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
 	}
+	// Material
+	triangleMesh.color = {0.2f, 0.8f, 0.2f};
 
 	/// Camera
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
@@ -79,7 +81,6 @@ extern "C" int main() {
 		make_float3(cameraUp[0].GetFloat(), cameraUp[1].GetFloat(), cameraUp[2].GetFloat()),
 		cameraFov
 	};
-	cout << "Camera FOV:\t" << camera.cosFovY << endl;
 	raytracing.setCamera(camera);
 
 	/// Init OptiX

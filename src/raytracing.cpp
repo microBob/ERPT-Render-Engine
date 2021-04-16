@@ -241,6 +241,9 @@ void Raytracing::createShaderBindingTable() {
 		auto optixSBTRecordPackHeader = optixSbtRecordPackHeader(hitgroupProgramGroups[objectType], &record);
 		assert(optixSBTRecordPackHeader == OPTIX_SUCCESS);
 		record.objectID = i;
+		record.data.vertex = (float3*) vertexBuffer.d_pointer();
+		record.data.index = (int3 *) indexBuffer.d_pointer();
+		record.data.color = triangleMesh.color;
 		hitgroupRecords.push_back(record);
 	}
 	hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);

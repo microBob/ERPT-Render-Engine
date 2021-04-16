@@ -9,6 +9,12 @@
 #include "optix_stubs.h"
 #include "types.h"
 
+struct TriangleMeshSBTData {
+	colorVector color;
+	float3 *vertex{};
+	int3 *index{}; // triangle vertices indices
+};
+
 struct OptixLaunchParameters {
 	struct {
 		colorVector *frameColorBuffer{};
