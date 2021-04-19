@@ -75,7 +75,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 	auto rawRayDirection = make_float3(camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
 	                                   camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
 	                                   camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
-	// TODO: can be faster with inverse square root https://www.youtube.com/watch?v=p8u_k2LIZyo
+	// TODO: can be faster with inverse square root `rnorm3df`: https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__SINGLE.html#group__CUDA__MATH__SINGLE
 	float rawRayMagnitude = sqrt(pow(rawRayDirection.x, 2) +
 	                             pow(rawRayDirection.y, 2) +
 	                             pow(rawRayDirection.z, 2));
@@ -103,8 +103,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 /// Miss program
 extern "C" __global__ void __miss__radiance() {
-	colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
-	perRayData = {1, 1, 1}; // Set to white
+	// No need to implement since data defaults to black
 }
 
 /// Hit program
