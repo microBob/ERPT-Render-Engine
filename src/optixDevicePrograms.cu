@@ -6,7 +6,7 @@
 #include "../include/optixLaunchParameters.h"
 #include "optix_device.h"
 
-// Launch Parameters
+/// Launch Parameters
 extern "C" __constant__ OptixLaunchParameters optixLaunchParameters;
 
 enum {
@@ -14,7 +14,23 @@ enum {
 	RAY_TYPE_COUNT
 };
 
-// Payload management
+/// Utility functions
+__device__ float3 normalizeVectorGPU(float3 vector) {
+	auto r_normal = rnorm3df(vector.x, vector.y, vector.z);
+
+	return make_float3(vector.x * r_normal, vector.y * r_normal, vector.z * r_normal);
+}
+
+__device__ float3 vectorCrossProductGPU(float3 vectorA, float3 vectorB) {
+	return make_float3(vectorA.y * vectorB.z - vectorA.z * vectorB.y, vectorA.z * vectorB.x - vectorA.x * vectorB.z,
+	                   vectorA.x * vectorB.y - vectorA.y * vectorB.x);
+}
+
+__device__ float vectorDotProductGPU(float3 vectorA, float3 vectorB) {
+	return vectorA.x * vectorB.x + vectorA.y * vectorB.y + vectorA.z * vectorB.z;
+}
+
+/// Payload management
 static __forceinline__ __device__ void *unpackPointer(uint32_t i0, uint32_t i1) {
 	const uint64_t rawPointer = static_cast<uint64_t>(i0) << 32 | i1;
 	void *pointer = reinterpret_cast<void *>(rawPointer);
@@ -34,7 +50,7 @@ static __forceinline__ __device__ T *getPerRayData() {
 	return reinterpret_cast<T *>( unpackPointer(u0, u1));
 }
 
-// Ray generation program
+/// Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
 	const unsigned int ix = optixGetLaunchIndex().x;
@@ -59,13 +75,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 	auto rawRayDirection = make_float3(camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
 	                                   camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
 	                                   camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
-	// TODO: can be faster with inverse square root https://www.youtube.com/watch?v=p8u_k2LIZyo
-	float rawRayMagnitude = sqrt(pow(rawRayDirection.x, 2) +
-	                             pow(rawRayDirection.y, 2) +
-	                             pow(rawRayDirection.z, 2));
-	auto rayDirectionNormalized = make_float3(rawRayDirection.x / rawRayMagnitude,
-	                                          rawRayDirection.y / rawRayMagnitude,
-	                                          rawRayDirection.z / rawRayMagnitude);
+	auto rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
 
 	// Optix Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
@@ -85,16 +95,31 @@ extern "C" __global__ void __raygen__renderFrame() {
 	optixLaunchParameters.frame.frameColorBuffer[colorBufferIndex] = pixelColorPerRayData;
 }
 
-// Miss program
+/// Miss program
 extern "C" __global__ void __miss__radiance() {
-	colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
-	perRayData = {1, 1, 1}; // Set to white
+	// No need to implement since data defaults to black
 }
 
-// Hit program
+/// Hit program
 extern "C" __global__ void __closesthit__radiance() {
+	const TriangleMeshSBTData &sbtData = *(const TriangleMeshSBTData *) optixGetSbtDataPointer();
+
+	// Compute surface normal
+	const int primitiveIndex = optixGetPrimitiveIndex();
+	const int3 index = sbtData.index[primitiveIndex];
+	const float3 &vertexA = sbtData.vertex[index.x];
+	const float3 &vertexB = sbtData.vertex[index.y];
+	const float3 &vertexC = sbtData.vertex[index.z];
+
+	auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
+	auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
+	const float3 Ng = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
+
+	// "NdotD" shading
+	const float3 rayDir = optixGetWorldRayDirection();
+	const float cosDN = 0.2f + 0.8f * fabsf(vectorDotProductGPU(rayDir, Ng));
 	colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
-	perRayData = {0, 0, 0};
+	perRayData = {cosDN * sbtData.color.r, cosDN * sbtData.color.g, cosDN * sbtData.color.b};
 }
 extern "C" __global__ void __anyhit__radiance() {}
 

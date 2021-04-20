@@ -25,6 +25,7 @@ struct Camera {
 struct TriangleMesh {
 	vector<float3> vertices;
 	vector<uint3> indices;
+	colorVector color;
 };
 
 //// SECTION: Class definition
@@ -120,7 +121,7 @@ struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) MissRecord {
 };
 struct __align__(OPTIX_SBT_RECORD_ALIGNMENT) HitgroupRecord {
 	__align__(OPTIX_SBT_RECORD_ALIGNMENT) char header[OPTIX_SBT_RECORD_HEADER_SIZE];
-	int objectID; // dummy variable
+	TriangleMeshSBTData data;
 };
 
 
