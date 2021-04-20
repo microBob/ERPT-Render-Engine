@@ -16,9 +16,9 @@ enum {
 
 /// Utility functions
 __device__ float3 normalizeVectorGPU(float3 vector) {
-	auto magnitude = static_cast<float>(sqrt(pow(vector.x, 2) + pow(vector.y, 2) + pow(vector.z, 2)));
+	auto r_normal = rnorm3df(vector.x, vector.y, vector.z);
 
-	return make_float3(vector.x / magnitude, vector.y / magnitude, vector.z / magnitude);
+	return make_float3(vector.x * r_normal, vector.y * r_normal, vector.z * r_normal);
 }
 
 __device__ float3 vectorCrossProductGPU(float3 vectorA, float3 vectorB) {
@@ -75,13 +75,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 	auto rawRayDirection = make_float3(camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
 	                                   camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
 	                                   camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
-	// TODO: can be faster with inverse square root `rnorm3df`: https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__SINGLE.html#group__CUDA__MATH__SINGLE
-	float rawRayMagnitude = sqrt(pow(rawRayDirection.x, 2) +
-	                             pow(rawRayDirection.y, 2) +
-	                             pow(rawRayDirection.z, 2));
-	auto rayDirectionNormalized = make_float3(rawRayDirection.x / rawRayMagnitude,
-	                                          rawRayDirection.y / rawRayMagnitude,
-	                                          rawRayDirection.z / rawRayMagnitude);
+	auto rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
 
 	// Optix Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
