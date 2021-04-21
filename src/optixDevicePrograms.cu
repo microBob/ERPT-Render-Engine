@@ -57,6 +57,10 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const unsigned int iy = optixGetLaunchIndex().y;
 	const auto &camera = optixLaunchParameters.camera;
 
+	if (ix == 0 && iy == 0) {
+		printf("Random Number: %f", optixLaunchParameters.mutationNumbers[0]);
+	}
+
 	// Create per ray data pointer
 	colorVector pixelColorPerRayData = {0, 0, 0};
 	uint32_t payload0, payload1;

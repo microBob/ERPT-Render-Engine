@@ -9,8 +9,9 @@
 #include "../include/kernels.cuh"
 #include "optix.h"
 #include "optix_stubs.h"
-#include "CUDABuffer.h"
 #include "optixLaunchParameters.h"
+#include "curand.h"
+#include "CUDABuffer.h"
 #include <vector>
 #include <cassert>
 
@@ -61,6 +62,9 @@ protected:
 
 	// Acceleration structure
 	OptixTraversableHandle buildAccelerationStructure(TriangleMesh &triMesh);
+
+	// Rendering mutation (random) number
+	void generateMutationNumbers(size_t nFloats);
 
 private:
 	static float3 normalizedVector(float3 vector);

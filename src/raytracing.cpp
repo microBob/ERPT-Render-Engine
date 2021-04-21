@@ -34,6 +34,8 @@ void Raytracing::initOptix(TriangleMesh &newMesh) {
 	// Create Acceleration Structure
 	triangleMesh = newMesh;
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(newMesh);
+	// Generate mutation numbers
+	generateMutationNumbers(100);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -397,6 +399,29 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triM
 	compactedSizeBuffer.free();
 
 	return accelerationStructureHandle;
+}
+
+void Raytracing::generateMutationNumbers(size_t nFloats) {
+	// Setup
+	curandGenerator_t gen;
+	float *deviceNumbers;
+	size_t arraySize = nFloats * sizeof(float);
+
+	optixLaunchParameters.mutationNumbers = static_cast<float *>(calloc(nFloats, arraySize));
+
+	// Allocate memory for data
+	cudaMalloc(reinterpret_cast<void **>(&deviceNumbers), arraySize);
+
+	// cuRAND setup
+	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+	curandSetPseudoRandomGeneratorSeed(gen, 1234ULL);
+	curandSetGeneratorOrdering(gen, CURAND_ORDERING_PSEUDO_SEEDED);
+
+	// Generate
+	curandGenerateUniform(gen, deviceNumbers, nFloats);
+
+	// Copy back to host
+	cudaMemcpy(optixLaunchParameters.mutationNumbers, deviceNumbers, arraySize, cudaMemcpyDeviceToHost);
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {
