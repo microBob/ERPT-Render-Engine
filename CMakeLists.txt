@@ -70,6 +70,7 @@ target_link_libraries(
 	CUDA::cudart
 	CUDA::cuda_driver
 	CUDA::cublas
+	CUDA::curand
 )
 
 # Copy for Labs

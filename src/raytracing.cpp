@@ -18,7 +18,7 @@ void Raytracing::initOptix(TriangleMesh &newMesh) {
 	// Call optixInit
 	OptixResult init = optixInit();
 	if (init != OPTIX_SUCCESS) {
-		cerr << "Optix call `optixInit()` failed wit code " << init << " (line " << __LINE__ << ")" << endl;
+		cerr << "Optix call `optixInit()` failed with code " << init << " (line " << __LINE__ << ")" << endl;
 		exit(2);
 	}
 
@@ -34,12 +34,13 @@ void Raytracing::initOptix(TriangleMesh &newMesh) {
 	// Create Acceleration Structure
 	triangleMesh = newMesh;
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(newMesh);
+	// Generate mutation numbers
+	generateMutationNumbers(100);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
 
 	optixLaunchParametersBuffer.alloc(sizeof(optixLaunchParameters));
-
 }
 
 extern "C" char embeddedPtxCode[];
@@ -57,7 +58,7 @@ void Raytracing::createOptixContext() {
 
 	auto createOptixDeviceContext = optixDeviceContextCreate(cudaContext, nullptr, &optixDeviceContext);
 	assert(createOptixDeviceContext == OPTIX_SUCCESS);
-	auto setOptixCallbackLogLevel = optixDeviceContextSetLogCallback(optixDeviceContext, contextLogCb, nullptr, 4);
+	auto setOptixCallbackLogLevel = optixDeviceContextSetLogCallback(optixDeviceContext, contextLogCb, nullptr, 2);
 	assert(setOptixCallbackLogLevel == OPTIX_SUCCESS);
 }
 
@@ -190,7 +191,7 @@ void Raytracing::createOptiXPipeline() {
 	                                               &optixPipeline);
 	assert(createOptixPipeline == OPTIX_SUCCESS);
 	if (logByteSize > 1) {
-		cout << log << endl;
+//		cout << log << endl;
 	}
 
 	// Set pipeline stack size
@@ -201,7 +202,7 @@ void Raytracing::createOptiXPipeline() {
 	                                                           1);
 	assert(setOptixPipelineStackSize == OPTIX_SUCCESS);
 	if (logByteSize > 1) {
-		cout << log << endl;
+//		cout << log << endl;
 	}
 }
 
@@ -397,6 +398,33 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triM
 	compactedSizeBuffer.free();
 
 	return accelerationStructureHandle;
+}
+
+void Raytracing::generateMutationNumbers(size_t nFloats) {
+	// Setup
+	curandGenerator_t gen;
+	float *deviceNumbers, *hostNumbers;
+	size_t arraySize = nFloats * sizeof(float);
+
+	// Allocate memory for data
+	hostNumbers = static_cast<float *>(calloc(nFloats, sizeof(float)));
+	cudaMalloc(reinterpret_cast<void **>(&deviceNumbers), arraySize);
+
+	// cuRAND setup
+	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+	curandSetPseudoRandomGeneratorSeed(gen, 0);
+	curandSetGeneratorOrdering(gen, CURAND_ORDERING_PSEUDO_SEEDED);
+
+	// Generate
+	curandGenerateUniform(gen, deviceNumbers, nFloats);
+
+	// Copy back to host
+	cudaMemcpy(hostNumbers, deviceNumbers, arraySize, cudaMemcpyDeviceToHost);
+
+	// Re-upload as buffer; TODO: improve this to not use re-upload
+	vector<float> vectorizedArray(hostNumbers, hostNumbers + nFloats);
+	mutationNumbersBuffer.alloc_and_upload(vectorizedArray);
+	optixLaunchParameters.mutationNumbers = (float *) mutationNumbersBuffer.d_pointer();
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {

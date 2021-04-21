@@ -27,9 +27,11 @@ private:
 	int blocksToLaunchForVertices;
 public:
 	Kernels();
+
 	int get_gpuID() const {
 		return gpuID;
 	};
+
 	int get_cpuID() const {
 		return cpuID;
 	};
@@ -37,6 +39,7 @@ public:
 	int get_threadsToLaunchForVertices() const {
 		return threadsToLaunchForVertices;
 	}
+
 	int get_blocksToLaunchForVertices() const {
 		return blocksToLaunchForVertices;
 	}
