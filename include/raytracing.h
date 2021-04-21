@@ -112,6 +112,8 @@ protected:
 
 	CUDABuffer accelerationStructureBuffer; // Compressed triangleMesh definition
 
+	CUDABuffer mutationNumbersBuffer;
+
 };
 
 //// SECTION: Shader binding table structs

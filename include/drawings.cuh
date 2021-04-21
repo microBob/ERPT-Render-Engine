@@ -23,10 +23,11 @@ public:
 
 	static void drawDotCPU(float x, float y, float *output, float screenWidth);
 
-	static vector<vector<unsigned int>> extractConnectedVerticesCPU(const rapidjson::GenericValue<rapidjson::UTF8<>>::Array &meshDataDOM);
+	static vector<vector<unsigned int>>
+	extractConnectedVerticesCPU(const rapidjson::GenericValue<rapidjson::UTF8<>>::Array &meshDataDOM);
 
 	static void drawWireframeCPU(float screenWidth, float screenHeight, float *pixData, const float *screenCoordinates,
-	                      vector<vector<unsigned int>> &connectedVertices);
+	                             vector<vector<unsigned int>> &connectedVertices);
 };
 
 #endif //ERPT_RENDER_ENGINE_DRAWINGS_CUH{};

@@ -27,7 +27,7 @@ struct OptixLaunchParameters {
 
 	OptixTraversableHandle optixTraversableHandle{};
 
-	float* mutationNumbers{};
+	float *mutationNumbers{};
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H
