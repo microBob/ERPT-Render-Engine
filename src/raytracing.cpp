@@ -35,8 +35,7 @@ void Raytracing::initOptix(TriangleMesh &newMesh) {
 	triangleMesh = newMesh;
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(newMesh);
 	// Generate mutation numbers
-	generateMutationNumbers(
-		optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y);
+	generateMutationNumbers(3 * 100);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -426,6 +425,13 @@ void Raytracing::generateMutationNumbers(size_t nFloats) {
 	vector<float> vectorizedArray(hostNumbers, hostNumbers + nFloats);
 	mutationNumbersBuffer.alloc_and_upload(vectorizedArray);
 	optixLaunchParameters.mutationNumbers = (float *) mutationNumbersBuffer.d_pointer();
+
+	// Also create ray hit meta buffer
+	RayHitMeta *hostHitMetas;
+	hostHitMetas = static_cast<RayHitMeta *>(calloc(nFloats / 3, sizeof(RayHitMeta)));
+	vector<RayHitMeta> vectorizedHitMetaArray(hostHitMetas, hostHitMetas + nFloats);
+	rayHitMetasBuffer.alloc_and_upload(vectorizedHitMetaArray);
+	optixLaunchParameters.rayHitMetas = (RayHitMeta *) rayHitMetasBuffer.d_pointer();
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {

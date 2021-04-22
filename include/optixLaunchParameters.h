@@ -15,6 +15,14 @@ struct TriangleMeshSBTData {
 	int3 *index{}; // triangle vertices indices
 };
 
+struct RayHitMeta {
+	float3 location;
+	bool cameraVisible;
+	unsigned long visits; // For detailed balance
+	unsigned long raysFromThisPoint; // Subsequent rays from this point
+	int energy; // Brightness
+};
+
 struct OptixLaunchParameters {
 	struct {
 		colorVector *frameColorBuffer{};
@@ -27,7 +35,10 @@ struct OptixLaunchParameters {
 
 	OptixTraversableHandle optixTraversableHandle{};
 
+	unsigned long mutationNumbersIndex = 0;
 	float *mutationNumbers{};
+
+	RayHitMeta *rayHitMetas{};
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H

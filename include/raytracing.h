@@ -114,6 +114,8 @@ protected:
 
 	CUDABuffer mutationNumbersBuffer;
 
+	CUDABuffer rayHitMetasBuffer;
+
 };
 
 //// SECTION: Shader binding table structs

@@ -137,6 +137,12 @@ extern "C" __global__ void __closesthit__radiance() {
 		printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
 		printf("Ray Length:\t\t%f\n", rayLength);
 		printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y, hitLocation.z);
+
+		// Set ray hit meta values
+		RayHitMeta thisHitMeta = {hitLocation, true, 1, 0, 1};
+		optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex] = thisHitMeta;
+		printf("Read Visits:\t%lu",
+		       optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex].visits);
 	}
 }
 extern "C" __global__ void __anyhit__radiance() {}
