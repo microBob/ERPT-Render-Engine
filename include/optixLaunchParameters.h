@@ -17,6 +17,8 @@ struct TriangleMeshSBTData {
 
 struct RayHitMeta {
 	float3 location;
+	float3 from; // Where did this hit originate from
+	float rayLength;
 	bool cameraVisible;
 	unsigned long visits; // For detailed balance
 	unsigned long raysFromThisPoint; // Subsequent rays from this point
@@ -36,7 +38,7 @@ struct OptixLaunchParameters {
 	OptixTraversableHandle optixTraversableHandle{};
 
 	unsigned long mutationNumbersIndex = 0;
-	float *mutationNumbers{};
+	float3 *mutationNumbers{};
 
 	RayHitMeta *rayHitMetas{};
 };

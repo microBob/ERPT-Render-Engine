@@ -53,8 +53,10 @@ static __forceinline__ __device__ T *getPerRayData() {
 /// Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
-	const unsigned int ix = optixGetLaunchIndex().x;
-	const unsigned int iy = optixGetLaunchIndex().y;
+//	const unsigned int ix = optixGetLaunchIndex().x;
+	const unsigned int ix = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
+//	const unsigned int iy = optixGetLaunchIndex().y;
+	const unsigned int iy = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
 	const auto &camera = optixLaunchParameters.camera;
 
 	// Create per ray data pointer
@@ -103,8 +105,10 @@ extern "C" __global__ void __miss__radiance() {
 /// Hit program
 extern "C" __global__ void __closesthit__radiance() {
 	const TriangleMeshSBTData &sbtData = *(const TriangleMeshSBTData *) optixGetSbtDataPointer();
-	const unsigned int ix = optixGetLaunchIndex().x;
-	const unsigned int iy = optixGetLaunchIndex().y;
+//	const unsigned int ix = optixGetLaunchIndex().x;
+	const unsigned int ix = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
+//	const unsigned int iy = optixGetLaunchIndex().y;
+	const unsigned int iy = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
 
 	// Compute surface normal
 	const int primitiveIndex = optixGetPrimitiveIndex();
@@ -123,27 +127,23 @@ extern "C" __global__ void __closesthit__radiance() {
 	colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
 	perRayData = {cosDN * sbtData.color.r, cosDN * sbtData.color.g, cosDN * sbtData.color.b};
 
-	// Extra stuff
-	if (ix == 480 && iy == 270) {
-		printf("Hit for 480, 270\n");
+	// Create hit meta
+	const float3 rayOrigin = optixGetWorldRayOrigin();
+	const float rayLength = optixGetRayTmax();
+	const float3 hitLocation = make_float3(rayOrigin.x + rayLength * rayDir.x, rayOrigin.y + rayLength * rayDir.y,
+	                                       rayOrigin.z + rayLength * rayDir.z);
+	RayHitMeta thisHitMeta = {hitLocation, rayOrigin, rayLength, true, 1, 0, 1};
+	optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex] = thisHitMeta;
 
-		// Calculate hit location
-		const float3 rayOrigin = optixGetWorldRayOrigin();
-		const float rayLength = optixGetRayTmax();
-		const float3 hitLocation = make_float3(rayOrigin.x + rayLength * rayDir.x, rayOrigin.y + rayLength * rayDir.y,
-		                                       rayOrigin.z + rayLength * rayDir.z);
+	// Debug prints
+	printf("Hit for 480, 270\n");// Calculate hit location
+	printf("Ray Origin:\t\t%f, %f, %f\n", rayOrigin.x, rayOrigin.y, rayOrigin.z);
+	printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
+	printf("Ray Length:\t\t%f\n", rayLength);
+	printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y, hitLocation.z);// Set ray hit meta values
 
-		printf("Ray Origin:\t\t%f, %f, %f\n", rayOrigin.x, rayOrigin.y, rayOrigin.z);
-		printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
-		printf("Ray Length:\t\t%f\n", rayLength);
-		printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y, hitLocation.z);
-
-		// Set ray hit meta values
-		RayHitMeta thisHitMeta = {hitLocation, true, 1, 0, 1};
-		optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex] = thisHitMeta;
-		printf("Read Visits:\t%lu",
-		       optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex].visits);
-	}
+	printf("Read Visits:\t%lu",
+	       optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex].visits);
 }
 extern "C" __global__ void __anyhit__radiance() {}
 
