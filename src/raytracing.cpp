@@ -35,7 +35,8 @@ void Raytracing::initOptix(TriangleMesh &newMesh) {
 	triangleMesh = newMesh;
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(newMesh);
 	// Generate mutation numbers
-	generateMutationNumbers(100);
+	generateMutationNumbers(
+		optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
