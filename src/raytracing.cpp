@@ -5,7 +5,7 @@
 // Created by microbobu on 2/15/21.
 //
 
-void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numberOfMutations) {
+void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numMutations) {
 	/// Initialize Optix library
 	// Reset and prep CUDA
 	cudaFree(nullptr);
@@ -35,7 +35,8 @@ void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numberOfMutation
 	triangleMeshes = meshes;
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(meshes);
 	// Generate mutation numbers
-	generateMutationNumbers(numberOfMutations);
+	numberOfMutations = numMutations;
+	generateMutationNumbers(numMutations);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -269,18 +270,20 @@ void Raytracing::optixRender() {
 //	                                  optixLaunchParameters.frame.frameBufferSize.y,
 //	                                  1);
 	// Single Ray system
-	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
-	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-	                                  1,
-	                                  1,
-	                                  1);
-	assert(launchingOptix == OPTIX_SUCCESS);
+	for (int i = 0; i < numberOfMutations; ++i) {
+		auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
+		                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
+		                                  1,
+		                                  1,
+		                                  1);
+		assert(launchingOptix == OPTIX_SUCCESS);
 
-	cudaDeviceSynchronize();
-	cudaError_t error = cudaGetLastError();
-	if (error != cudaSuccess) {
-		fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
-		exit(2);
+		cudaDeviceSynchronize();
+		cudaError_t error = cudaGetLastError();
+		if (error != cudaSuccess) {
+			fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
+			exit(2);
+		}
 	}
 }
 

@@ -33,7 +33,7 @@ struct TriangleMesh {
 //// SECTION: Class definition
 class Raytracing {
 public:
-	void initOptix(vector<TriangleMesh> &meshes, size_t numberOfMutations = 100);
+	void initOptix(vector<TriangleMesh> &meshes, size_t numMutations = 100);
 
 	void setFrameSize(const uint2 &newSize);
 
@@ -113,6 +113,7 @@ protected:
 
 	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
 
+	size_t numberOfMutations;
 	CUDABuffer mutationNumbersBuffer;
 
 	CUDABuffer rayHitMetasBuffer;

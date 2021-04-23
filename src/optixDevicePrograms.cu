@@ -53,6 +53,7 @@ static __forceinline__ __device__ T *getPerRayData() {
 /// Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
+	// TODO: get point in 3D space back to screen; probably use perspective matrix from transform and a second trace to test of camera can see. maybe ask Cline
 //	const unsigned int ix = optixGetLaunchIndex().x;
 	const unsigned int ix = optixLaunchParameters.frame.frameBufferSize.x / 2 - 1;
 //	const unsigned int iy = optixGetLaunchIndex().y;
@@ -64,24 +65,51 @@ extern "C" __global__ void __raygen__renderFrame() {
 	uint32_t payload0, payload1;
 	packPointer(&pixelColorPerRayData, payload0, payload1);
 
-	// Generate ray direction from screen
-	const auto screen = make_float2(
-		(static_cast<float>(ix) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-		(static_cast<float>(iy) + 0.5f) / static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
-	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
-	auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
-	                                              screenMinus.x * camera.horizontal.y,
-	                                              screenMinus.x * camera.horizontal.z);
-	auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x, screenMinus.y * camera.vertical.y,
-	                                            screenMinus.y * camera.vertical.z);
-	auto rawRayDirection = make_float3(camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
-	                                   camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
-	                                   camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
-	auto rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
+	/// Generate random ray direction
+	float3 rayOrigin; // Where the ray starts
+	float3 rayDirectionNormalized; // Where the ray goes
+	// Get random number set
+	const float3 &mutationNumbersSet = optixLaunchParameters.mutationNumbers[optixLaunchParameters.mutationNumbersIndex];
+	if (optixLaunchParameters.rayHitIndex == 0) { // So start from screen
+		const unsigned int randScreenX = llrintf(
+			mutationNumbersSet.x * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1));
+		const unsigned int randScreenY = llrintf(
+			mutationNumbersSet.y * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y - 1));
+		const auto screen = make_float2(
+			(static_cast<float>(randScreenX) + 0.5f) /
+			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
+			(static_cast<float>(randScreenY) + 0.5f) /
+			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+		auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
+		auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
+		                                              screenMinus.x * camera.horizontal.y,
+		                                              screenMinus.x * camera.horizontal.z);
+		auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
+		                                            screenMinus.y * camera.vertical.y,
+		                                            screenMinus.y * camera.vertical.z);
+		auto rawRayDirection = make_float3(
+			camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
+			camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
+			camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
+
+		rayOrigin = camera.position;
+		rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
+	} else { // -1 from rayHitIndex to get hit meta to use
+		const float3 newRayDirRaw = make_float3(cospif(mutationNumbersSet.x), cospif(mutationNumbersSet.y),
+		                                        cospif(mutationNumbersSet.z));
+		const float rayDirInverseMagnitude = rnorm3df(newRayDirRaw.x, newRayDirRaw.y, newRayDirRaw.z);
+		RayHitMeta thisRayMeta = optixLaunchParameters.rayHitMetas[optixLaunchParameters.rayHitIndex - 1];
+
+		rayOrigin = thisRayMeta.hitLocation;
+		rayDirectionNormalized = make_float3(newRayDirRaw.x * rayDirInverseMagnitude + thisRayMeta.hitNormal.x,
+		                                               newRayDirRaw.y * rayDirInverseMagnitude + thisRayMeta.hitNormal.y,
+		                                               newRayDirRaw.z * rayDirInverseMagnitude + thisRayMeta.hitNormal.z);
+	}
+
 
 	// Optix Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
-	           camera.position,
+	           rayOrigin,
 	           rayDirectionNormalized,
 	           0.f,
 	           1e20f,
@@ -136,15 +164,12 @@ extern "C" __global__ void __closesthit__radiance() {
 	optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex] = thisHitMeta;
 
 	// Debug prints
-	printf("Hit for 480, 270\n");// Calculate hit location
+	printf("Hit for 480, 270\n");// Calculate hit hitLocation
 	printf("Ray Origin:\t\t%f, %f, %f\n", rayOrigin.x, rayOrigin.y, rayOrigin.z);
 	printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
 	printf("Ray Length:\t\t%f\n", rayLength);
 	printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y, hitLocation.z);// Set ray hit meta values
 	printf("Object Kind:\t%s", (sbtData.kind == mesh ? "Mesh" : "Light"));
-
-	printf("Read Visits:\t%lu",
-	       optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex].visits);
 }
 extern "C" __global__ void __anyhit__radiance() {}
 
