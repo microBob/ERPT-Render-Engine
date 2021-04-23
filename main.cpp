@@ -50,23 +50,33 @@ extern "C" int main() {
 	raytracing.setFrameSize(frameBufferSize);
 
 	/// Translate scene data
-	TriangleMesh triangleMesh;
-	// Mesh Vertices
-	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetObject();
-	for (auto &curVertex : meshDataDOM.FindMember(VERTICES)->value.GetArray()) {
-		auto vertexArray = curVertex.GetArray();
-		triangleMesh.vertices.push_back(
-			make_float3(vertexArray[0].GetFloat(), vertexArray[1].GetFloat(),
-			            vertexArray[2].GetFloat()));
+	vector<TriangleMesh> triangleMeshes;
+	// For each mesh
+	for (auto &curMesh : sceneDataDOM.FindMember(MESHES)->value.GetArray()) {
+		TriangleMesh curMeshEncode;
+		// Vertices
+		for (auto &curVertex : curMesh.FindMember(VERTICES)->value.GetArray()) {
+			auto vertexArray = curVertex.GetArray();
+			curMeshEncode.vertices.push_back(
+				make_float3(vertexArray[0].GetFloat(), vertexArray[1].GetFloat(),
+				            vertexArray[2].GetFloat()));
+		}
+		// Face Indices
+		for (auto &curFace : curMesh.FindMember(INDICES)->value.GetArray()) {
+			auto indexArray = curFace.GetArray();
+			curMeshEncode.indices.push_back(
+				make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
+		}
+		// Kind
+		curMeshEncode.meshKind = static_cast<objectKind>(curMesh.FindMember(KIND)->value.GetInt());
+		// Color
+		if (curMeshEncode.meshKind == mesh) {
+			curMeshEncode.color = {0.2f, 0.8f, 0.2f};
+		}
+
+		// Add to triangleMeshes
+		triangleMeshes.push_back(curMeshEncode);
 	}
-	// Face Indices
-	for (auto &curFace : meshDataDOM.FindMember(INDICES)->value.GetArray()) {
-		auto indexArray = curFace.GetArray();
-		triangleMesh.indices.push_back(
-			make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
-	}
-	// Material
-	triangleMesh.color = {0.2f, 0.8f, 0.2f};
 
 	/// Camera
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
@@ -85,7 +95,7 @@ extern "C" int main() {
 
 	/// Init OptiX
 	try {
-		raytracing.initOptix(triangleMesh);
+		raytracing.initOptix(triangleMeshes); // Defaults to 100 mutations
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);

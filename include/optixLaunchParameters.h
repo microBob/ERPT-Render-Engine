@@ -10,9 +10,10 @@
 #include "types.h"
 
 struct TriangleMeshSBTData {
-	colorVector color;
 	float3 *vertex{};
 	int3 *index{}; // triangle vertices indices
+	colorVector color;
+	objectKind kind{};
 };
 
 struct RayHitMeta {

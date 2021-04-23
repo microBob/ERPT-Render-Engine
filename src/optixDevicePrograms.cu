@@ -54,9 +54,9 @@ static __forceinline__ __device__ T *getPerRayData() {
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
 //	const unsigned int ix = optixGetLaunchIndex().x;
-	const unsigned int ix = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
+	const unsigned int ix = optixLaunchParameters.frame.frameBufferSize.x / 2 - 1;
 //	const unsigned int iy = optixGetLaunchIndex().y;
-	const unsigned int iy = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
+	const unsigned int iy = optixLaunchParameters.frame.frameBufferSize.y / 2 - 1;
 	const auto &camera = optixLaunchParameters.camera;
 
 	// Create per ray data pointer
@@ -106,9 +106,9 @@ extern "C" __global__ void __miss__radiance() {
 extern "C" __global__ void __closesthit__radiance() {
 	const TriangleMeshSBTData &sbtData = *(const TriangleMeshSBTData *) optixGetSbtDataPointer();
 //	const unsigned int ix = optixGetLaunchIndex().x;
-	const unsigned int ix = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
+	const unsigned int ix = optixLaunchParameters.frame.frameBufferSize.x / 2 - 1;
 //	const unsigned int iy = optixGetLaunchIndex().y;
-	const unsigned int iy = optixLaunchParameters.frame.frameBufferSize / 2 - 1;
+	const unsigned int iy = optixLaunchParameters.frame.frameBufferSize.y / 2 - 1;
 
 	// Compute surface normal
 	const int primitiveIndex = optixGetPrimitiveIndex();
@@ -141,6 +141,7 @@ extern "C" __global__ void __closesthit__radiance() {
 	printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
 	printf("Ray Length:\t\t%f\n", rayLength);
 	printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y, hitLocation.z);// Set ray hit meta values
+	printf("Object Kind:\t%s", (sbtData.kind == mesh ? "Mesh" : "Light"));
 
 	printf("Read Visits:\t%lu",
 	       optixLaunchParameters.rayHitMetas[optixLaunchParameters.mutationNumbersIndex].visits);
