@@ -266,29 +266,15 @@ void Raytracing::setFrameSize(const uint2 &newSize) {
 void Raytracing::optixRender() {
 	optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
-	// Determine visible locations
-	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
-	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-	                                  optixLaunchParameters.frame.frameBufferSize.x,
-	                                  optixLaunchParameters.frame.frameBufferSize.y,
-	                                  1);
-	assert(launchingOptix == OPTIX_SUCCESS);
-
-	cudaDeviceSynchronize();
-	cudaError_t error = cudaGetLastError();
-	if (error != cudaSuccess) {
-		fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
-		exit(2);
-	}
 
 	// Single Ray MLT
 	for (int i = 0; i < numberOfMutations; ++i) {
-		launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
-		                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-		                                  1,
-		                                  1,
-		                                  1);
-		assert(launchingOptix == OPTIX_SUCCESS);
+		auto launchingOptixRender = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
+		                                        optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
+		                                        1,
+		                                        1,
+		                                        1);
+		assert(launchingOptixRender == OPTIX_SUCCESS);
 
 		cudaDeviceSynchronize();
 		cudaError_t error = cudaGetLastError();
@@ -296,6 +282,20 @@ void Raytracing::optixRender() {
 			fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
 			exit(2);
 		}
+	}
+	// Determine visible locations
+	auto launchingOptixVisibilityCheck = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
+	                                                 optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
+	                                                 optixLaunchParameters.frame.frameBufferSize.x,
+	                                                 optixLaunchParameters.frame.frameBufferSize.y,
+	                                                 1);
+	assert(launchingOptixVisibilityCheck == OPTIX_SUCCESS);
+
+	cudaDeviceSynchronize();
+	cudaError_t error = cudaGetLastError();
+	if (error != cudaSuccess) {
+		fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
+		exit(2);
 	}
 }
 

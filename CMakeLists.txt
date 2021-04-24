@@ -47,7 +47,7 @@ add_executable(
 	include/CUDABuffer.h
 	${embeddedPtxCode}
 	include/types.h)
-add_executable(LABS labs/labs.cpp labs/another.h)
+add_executable(LABS labs/labs.cpp labs/another.h labs/labs.h)
 
 # For project
 add_definitions(-D__CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__=1)

@@ -21,9 +21,9 @@ struct RayHitMeta {
 	float3 from; // Where did this hit originate from
 	float3 hitNormal;
 	float rayLength;
-	bool cameraVisible;
 	unsigned long visits; // For detailed balance
-	unsigned long raysFromThisPoint; // Subsequent rays from this point
+	bool isRootRay;
+	unsigned long sourceRayIndex; // Subsequent rays from this point
 	int energy; // Brightness
 };
 

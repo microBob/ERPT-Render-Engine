@@ -53,7 +53,6 @@ static __forceinline__ __device__ T *getPerRayData() {
 /// Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
-	// TODO: get point in 3D space back to screen; probably use perspective matrix from transform and a second trace to test of camera can see. maybe ask Cline
 	const unsigned int ix = optixGetLaunchIndex().x;
 	const unsigned int iy = optixGetLaunchIndex().y;
 	const auto &camera = optixLaunchParameters.camera;
@@ -62,12 +61,68 @@ extern "C" __global__ void __raygen__renderFrame() {
 	float3 rayOrigin; // Where the ray starts
 	float3 rayDirectionNormalized; // Where the ray goes
 
-	if (ix == 0 && iy == 0) {
-		printf("visibility status: %f, %f", optixLaunchParameters.frame.visibleLocations[0].x,
-		       optixLaunchParameters.frame.visibleLocations[1].x);
-	}
+	if (optixLaunchParameters.mutation.index <
+	    optixLaunchParameters.frame.frameBufferSize.x *
+	    optixLaunchParameters.frame.frameBufferSize.y) { // Still have mutations = rendering
+		/// Generate random ray direction
+		// Get random number set
+		const float3 &mutationNumbersSet = optixLaunchParameters.mutation.numbers[optixLaunchParameters.mutation.index];
+		if (optixLaunchParameters.rayHit.startFromScreen) { // So start from screen
+			const unsigned int randScreenX = llrintf(
+				mutationNumbersSet.x * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1));
+			const unsigned int randScreenY = llrintf(
+				mutationNumbersSet.y * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y - 1));
+			const auto screen = make_float2(
+				(static_cast<float>(randScreenX) + 0.5f) /
+				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
+				(static_cast<float>(randScreenY) + 0.5f) /
+				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+			auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
+			auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
+			                                              screenMinus.x * camera.horizontal.y,
+			                                              screenMinus.x * camera.horizontal.z);
+			auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
+			                                            screenMinus.y * camera.vertical.y,
+			                                            screenMinus.y * camera.vertical.z);
+			auto rawRayDirection = make_float3(
+				camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
+				camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
+				camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
 
-	if (ix > 0 && iy > 0) { // Visibility location rays
+			rayOrigin = camera.position;
+			rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
+		} else {
+			const float3 newRayDirRaw = make_float3(cospif(mutationNumbersSet.x), cospif(mutationNumbersSet.y),
+			                                        cospif(mutationNumbersSet.z));
+			const float rayDirInverseMagnitude = rnorm3df(newRayDirRaw.x, newRayDirRaw.y, newRayDirRaw.z);
+			RayHitMeta sourceRayMeta = optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index];
+
+			rayOrigin = sourceRayMeta.hitLocation;
+			rayDirectionNormalized = make_float3(newRayDirRaw.x * rayDirInverseMagnitude + sourceRayMeta.hitNormal.x,
+			                                     newRayDirRaw.y * rayDirInverseMagnitude + sourceRayMeta.hitNormal.y,
+			                                     newRayDirRaw.z * rayDirInverseMagnitude + sourceRayMeta.hitNormal.z);
+		}
+		optixLaunchParameters.mutation.index++;
+
+		// Optix Trace
+		optixTrace(optixLaunchParameters.optixTraversableHandle,
+		           rayOrigin,
+		           rayDirectionNormalized,
+		           0.f,
+		           1e20f,
+		           0.0f,
+		           OptixVisibilityMask(255),
+		           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+		           SURFACE_RAY_TYPE,
+		           RAY_TYPE_COUNT,
+		           SURFACE_RAY_TYPE);
+	} else { // Done rendering and is now checking for visibility
+		// Create per ray data pointer
+		colorVector pixelColorPerRayData = {0, 0, 0};
+		uint32_t payload0, payload1;
+		packPointer(&pixelColorPerRayData, payload0, payload1);
+
+		// Creating screen ray
 		const auto screen = make_float2(
 			(static_cast<float>(ix) + 0.5f) /
 			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
@@ -99,67 +154,11 @@ extern "C" __global__ void __raygen__renderFrame() {
 		           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
 		           SURFACE_RAY_TYPE,
 		           RAY_TYPE_COUNT,
-		           SURFACE_RAY_TYPE);
-	} else { // An actual render trace
-		// Create per ray data pointer
-		colorVector pixelColorPerRayData = {0, 0, 0};
-		uint32_t payload0, payload1;
-		packPointer(&pixelColorPerRayData, payload0, payload1);
-
-		/// Generate random ray direction
-		// Get random number set
-		const float3 &mutationNumbersSet = optixLaunchParameters.mutation.numbers[optixLaunchParameters.mutation.index];
-		if (optixLaunchParameters.rayHit.startFromScreen) { // So start from screen
-			const unsigned int randScreenX = llrintf(
-				mutationNumbersSet.x * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1));
-			const unsigned int randScreenY = llrintf(
-				mutationNumbersSet.y * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y - 1));
-			const auto screen = make_float2(
-				(static_cast<float>(randScreenX) + 0.5f) /
-				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-				(static_cast<float>(randScreenY) + 0.5f) /
-				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
-			auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
-			auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
-			                                              screenMinus.x * camera.horizontal.y,
-			                                              screenMinus.x * camera.horizontal.z);
-			auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
-			                                            screenMinus.y * camera.vertical.y,
-			                                            screenMinus.y * camera.vertical.z);
-			auto rawRayDirection = make_float3(
-				camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
-				camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
-				camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
-
-			rayOrigin = camera.position;
-			rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
-		} else { // -1 from index to get hit meta to use
-			const float3 newRayDirRaw = make_float3(cospif(mutationNumbersSet.x), cospif(mutationNumbersSet.y),
-			                                        cospif(mutationNumbersSet.z));
-			const float rayDirInverseMagnitude = rnorm3df(newRayDirRaw.x, newRayDirRaw.y, newRayDirRaw.z);
-			RayHitMeta thisRayMeta = optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index - 1];
-
-			rayOrigin = thisRayMeta.hitLocation;
-			rayDirectionNormalized = make_float3(newRayDirRaw.x * rayDirInverseMagnitude + thisRayMeta.hitNormal.x,
-			                                     newRayDirRaw.y * rayDirInverseMagnitude + thisRayMeta.hitNormal.y,
-			                                     newRayDirRaw.z * rayDirInverseMagnitude + thisRayMeta.hitNormal.z);
-		}
-		optixLaunchParameters.mutation.index++;
-
-		// Optix Trace
-		optixTrace(optixLaunchParameters.optixTraversableHandle,
-		           rayOrigin,
-		           rayDirectionNormalized,
-		           0.f,
-		           1e20f,
-		           0.0f,
-		           OptixVisibilityMask(255),
-		           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
 		           SURFACE_RAY_TYPE,
-		           RAY_TYPE_COUNT,
-		           SURFACE_RAY_TYPE,
-		           payload0, payload1);
+		           payload0,
+		           payload1);
 
+		// Record data
 		const unsigned int colorBufferIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 		optixLaunchParameters.frame.frameColorBuffer[colorBufferIndex] = pixelColorPerRayData;
 	}
@@ -170,7 +169,9 @@ extern "C" __global__ void __miss__radiance() {
 	const unsigned int ix = optixGetLaunchIndex().x;
 	const unsigned int iy = optixGetLaunchIndex().y;
 
-	if (ix > 0 && iy > 0) { // Visibility check operation
+	if (optixLaunchParameters.mutation.index <
+	    optixLaunchParameters.frame.frameBufferSize.x *
+	    optixLaunchParameters.frame.frameBufferSize.y) { // Visibility check operation
 		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 		optixLaunchParameters.frame.visibleLocations[visibleIndex] = make_float3(nanf(""), nanf(""), nanf(""));
 	}
@@ -189,7 +190,9 @@ extern "C" __global__ void __closesthit__radiance() {
 	const float3 hitLocation = make_float3(rayOrigin.x + rayLength * rayDir.x, rayOrigin.y + rayLength * rayDir.y,
 	                                       rayOrigin.z + rayLength * rayDir.z);
 
-	if (ix > 0 && iy > 0) { // Visibility check operation
+	if (optixLaunchParameters.mutation.index <
+	    optixLaunchParameters.frame.frameBufferSize.x *
+	    optixLaunchParameters.frame.frameBufferSize.y) { // Visibility check operation
 		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 		optixLaunchParameters.frame.visibleLocations[visibleIndex] = hitLocation;
 	} else { // Trace operation
@@ -210,9 +213,10 @@ extern "C" __global__ void __closesthit__radiance() {
 		perRayData = {cosDN * sbtData.color.r, cosDN * sbtData.color.g, cosDN * sbtData.color.b};
 
 		// Create hit meta
-		RayHitMeta thisHitMeta = {hitLocation, rayOrigin, Ng, rayLength, true, 1, 0, 1};
-		optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index] = thisHitMeta;
+		RayHitMeta thisHitMeta = {hitLocation, rayOrigin, Ng, rayLength, 1,
+		                          optixLaunchParameters.rayHit.startFromScreen, optixLaunchParameters.rayHit.index, 1};
 		optixLaunchParameters.rayHit.index++;
+		optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index] = thisHitMeta;
 
 		// Debug prints
 		printf("Hit for 480, 270\n");// Calculate hit hitLocation
