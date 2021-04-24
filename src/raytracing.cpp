@@ -255,23 +255,35 @@ void Raytracing::createShaderBindingTable() {
 void Raytracing::setFrameSize(const uint2 &newSize) {
 	// Update cuda frame buffer
 	frameColorBuffer.resize(newSize.x * newSize.y * sizeof(colorVector));
+	visibleLocationsBuffer.resize(newSize.x * newSize.y * sizeof(float3));
 
 	// Update launch parameters
 	optixLaunchParameters.frame.frameBufferSize = newSize;
 	optixLaunchParameters.frame.frameColorBuffer = static_cast<colorVector *>(frameColorBuffer.d_ptr);
+	optixLaunchParameters.frame.visibleLocations = static_cast<float3 *>(visibleLocationsBuffer.d_ptr);
 }
 
 void Raytracing::optixRender() {
 	optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
-//	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
-//	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-//	                                  optixLaunchParameters.frame.frameBufferSize.x,
-//	                                  optixLaunchParameters.frame.frameBufferSize.y,
-//	                                  1);
-	// Single Ray system
+	// Determine visible locations
+	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
+	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
+	                                  optixLaunchParameters.frame.frameBufferSize.x,
+	                                  optixLaunchParameters.frame.frameBufferSize.y,
+	                                  1);
+	assert(launchingOptix == OPTIX_SUCCESS);
+
+	cudaDeviceSynchronize();
+	cudaError_t error = cudaGetLastError();
+	if (error != cudaSuccess) {
+		fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
+		exit(2);
+	}
+
+	// Single Ray MLT
 	for (int i = 0; i < numberOfMutations; ++i) {
-		auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
+		launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
 		                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
 		                                  1,
 		                                  1,
@@ -447,18 +459,11 @@ void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long
 
 	// Re-upload as buffer; TODO: improve this to not use re-upload
 	mutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
-	optixLaunchParameters.mutationNumbers = (float3 *) mutationNumbersBuffer.d_pointer();
+	optixLaunchParameters.mutation.numbers = static_cast<float3 *>(mutationNumbersBuffer.d_ptr);
 
 	// Also create ray hit meta buffer
-	RayHitMeta *hostHitMetas;
-	hostHitMetas = static_cast<RayHitMeta *>(calloc(numMutations, sizeof(RayHitMeta)));
-	vector<RayHitMeta> vectorizedHitMetaArray(hostHitMetas, hostHitMetas + numMutations);
-	rayHitMetasBuffer.alloc_and_upload(vectorizedHitMetaArray);
-	optixLaunchParameters.rayHitMetas = (RayHitMeta *) rayHitMetasBuffer.d_pointer();
-
-	// Cleanup
-//	cudaFree(deviceNumbers);
-//	free(hostNumbers);
+	rayHitMetasBuffer.resize(numMutations * sizeof(RayHitMeta));
+	optixLaunchParameters.rayHit.metas = static_cast<RayHitMeta *>(rayHitMetasBuffer.d_ptr);
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {

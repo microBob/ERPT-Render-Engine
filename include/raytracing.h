@@ -27,7 +27,7 @@ struct TriangleMesh {
 	vector<float3> vertices;
 	vector<uint3> indices;
 	colorVector color;
-	objectKind meshKind;
+	MeshKind meshKind;
 };
 
 //// SECTION: Class definition
@@ -103,17 +103,18 @@ protected: // Launch and rendering
 	OptixLaunchParameters optixLaunchParameters;
 	CUDABuffer optixLaunchParametersBuffer;
 	CUDABuffer frameColorBuffer;
+	CUDABuffer visibleLocationsBuffer;
 
 protected:
 	Camera lastSetCamera; // Camera used for rendering
-
-	vector<TriangleMesh> triangleMeshes; // mesh definition
+	vector<TriangleMesh> triangleMeshes; // Mesh definition
 	vector<CUDABuffer> vertexBuffer;
+
 	vector<CUDABuffer> indexBuffer;
 
 	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
-
 	size_t numberOfMutations;
+
 	CUDABuffer mutationNumbersBuffer;
 
 	CUDABuffer rayHitMetasBuffer;

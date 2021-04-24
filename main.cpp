@@ -51,7 +51,7 @@ extern "C" int main() {
 
 	/// Translate scene data
 	vector<TriangleMesh> triangleMeshes;
-	// For each mesh
+	// For each Mesh
 	for (auto &curMesh : sceneDataDOM.FindMember(MESHES)->value.GetArray()) {
 		TriangleMesh curMeshEncode;
 		// Vertices
@@ -68,9 +68,9 @@ extern "C" int main() {
 				make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
 		}
 		// Kind
-		curMeshEncode.meshKind = static_cast<objectKind>(curMesh.FindMember(KIND)->value.GetInt());
+		curMeshEncode.meshKind = static_cast<MeshKind>(curMesh.FindMember(KIND)->value.GetInt());
 		// Color
-		if (curMeshEncode.meshKind == mesh) {
+		if (curMeshEncode.meshKind == Mesh) {
 			curMeshEncode.color = {0.2f, 0.8f, 0.2f};
 		}
 

@@ -13,9 +13,9 @@ struct colorVector {
 	float a = 1;
 };
 
-enum objectKind {
-	mesh,
-	light
+enum MeshKind {
+	Mesh,
+	Light
 };
 
 #endif //ERPT_RENDER_ENGINE_TYPES_H
