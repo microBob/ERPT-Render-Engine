@@ -46,11 +46,11 @@ struct OptixLaunchParameters {
 	} mutation;
 
 	struct {
-		float visibilityTolerance = 0.01;
+		float visibilityTolerance = 0.005;
 		RayHitMeta *metas{};
 	} rayHit;
 
-	unsigned long *systemState{};
+	unsigned long *systemState{}; // Mutation index, RayHitMeta index, Start from screen bool
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H

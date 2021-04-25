@@ -95,7 +95,7 @@ extern "C" int main() {
 
 	/// Init OptiX
 	try {
-		raytracing.initOptix(triangleMeshes, 10);
+		raytracing.initOptix(triangleMeshes, 2000);
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);

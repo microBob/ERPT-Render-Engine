@@ -266,7 +266,6 @@ void Raytracing::setFrameSize(const uint2 &newSize) {
 void Raytracing::optixRender() {
 	optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
-
 	// Single Ray MLT
 	for (int i = 0; i < numberOfMutations; ++i) {
 		auto launchingOptixRender = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),

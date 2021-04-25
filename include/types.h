@@ -18,4 +18,10 @@ enum MeshKind {
 	Light
 };
 
+enum OptiXStateIndex {
+	MutationIndex,
+	RayHitMetaIndex,
+	StartFromScreenBool
+};
+
 #endif //ERPT_RENDER_ENGINE_TYPES_H
