@@ -41,16 +41,16 @@ struct OptixLaunchParameters {
 	OptixTraversableHandle optixTraversableHandle{};
 
 	struct {
-		unsigned long index = 0;
+		size_t numberOfThem{};
 		float3 *numbers{};
 	} mutation;
 
 	struct {
-		bool startFromScreen = true;
 		float visibilityTolerance = 0.01;
-		unsigned long index = 0;
 		RayHitMeta *metas{};
 	} rayHit;
+
+	unsigned long *systemState{};
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H

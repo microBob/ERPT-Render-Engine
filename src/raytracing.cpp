@@ -460,10 +460,16 @@ void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long
 	// Re-upload as buffer; TODO: improve this to not use re-upload
 	mutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
 	optixLaunchParameters.mutation.numbers = static_cast<float3 *>(mutationNumbersBuffer.d_ptr);
+	optixLaunchParameters.mutation.numberOfThem = numMutations;
 
 	// Also create ray hit meta buffer
 	rayHitMetasBuffer.resize(numMutations * sizeof(RayHitMeta));
 	optixLaunchParameters.rayHit.metas = static_cast<RayHitMeta *>(rayHitMetasBuffer.d_ptr);
+
+	// Also create system state
+	vector<unsigned long> systemStateVector{0, 0, 1}; // mutation index, rayHitMeta index, start from screen
+	systemStateBuffer.alloc_and_upload(systemStateVector);
+	optixLaunchParameters.systemState = static_cast<unsigned long *>(systemStateBuffer.d_ptr);
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {

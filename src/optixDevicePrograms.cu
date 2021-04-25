@@ -61,13 +61,13 @@ extern "C" __global__ void __raygen__renderFrame() {
 	float3 rayOrigin; // Where the ray starts
 	float3 rayDirectionNormalized; // Where the ray goes
 
-	if (optixLaunchParameters.mutation.index <
-	    optixLaunchParameters.frame.frameBufferSize.x *
-	    optixLaunchParameters.frame.frameBufferSize.y) { // Still have mutations = rendering
+	if (optixLaunchParameters.systemState[0] <
+	    optixLaunchParameters.mutation.numberOfThem) { // Still have mutations = rendering
+		printf("Render trace #%lu\n", optixLaunchParameters.systemState[0]);
 		/// Generate random ray direction
 		// Get random number set
-		const float3 &mutationNumbersSet = optixLaunchParameters.mutation.numbers[optixLaunchParameters.mutation.index];
-		if (optixLaunchParameters.rayHit.startFromScreen) {
+		const float3 &mutationNumbersSet = optixLaunchParameters.mutation.numbers[optixLaunchParameters.systemState[1]];
+		if (optixLaunchParameters.systemState[2]) {
 			const unsigned int randScreenX = llrintf(
 				mutationNumbersSet.x * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1));
 			const unsigned int randScreenY = llrintf(
@@ -95,21 +95,14 @@ extern "C" __global__ void __raygen__renderFrame() {
 			const float3 newRayDirRaw = make_float3(cospif(mutationNumbersSet.x), cospif(mutationNumbersSet.y),
 			                                        cospif(mutationNumbersSet.z));
 			const float rayDirInverseMagnitude = rnorm3df(newRayDirRaw.x, newRayDirRaw.y, newRayDirRaw.z);
-			RayHitMeta sourceRayMeta = optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index];
+			RayHitMeta sourceRayMeta = optixLaunchParameters.rayHit.metas[optixLaunchParameters.systemState[1]];
 
 			rayOrigin = sourceRayMeta.hitLocation;
 			rayDirectionNormalized = make_float3(newRayDirRaw.x * rayDirInverseMagnitude + sourceRayMeta.hitNormal.x,
 			                                     newRayDirRaw.y * rayDirInverseMagnitude + sourceRayMeta.hitNormal.y,
 			                                     newRayDirRaw.z * rayDirInverseMagnitude + sourceRayMeta.hitNormal.z);
 		}
-		printf("Pre inc\n");
-		optixLaunchParameters.frame.visibleLocations[0] = make_float3(8, 7, 6);
-		printf("Cur Inc: %lu\n", optixLaunchParameters.mutation.index);
-		printf("New X: %f\n", optixLaunchParameters.frame.visibleLocations[0].x);
-		optixLaunchParameters.mutation.index = 1;
-		printf("Manual Inc\n");
-		optixLaunchParameters.mutation.index += 1;
-		printf("Post inc\n");
+		optixLaunchParameters.systemState[0]++;
 
 		// Optix Trace
 		optixTrace(optixLaunchParameters.optixTraversableHandle,
@@ -170,7 +163,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 		float3 visibilityHitLocation = optixLaunchParameters.frame.visibleLocations[frameIndex];
 
 		if (visibilityHitLocation.x != nanf("")) {
-			for (unsigned int hitIndex = 0; hitIndex <= optixLaunchParameters.rayHit.index; ++hitIndex) {
+			for (unsigned int hitIndex = 0; hitIndex <= optixLaunchParameters.systemState[1]; ++hitIndex) {
 				RayHitMeta thisHitMeta = optixLaunchParameters.rayHit.metas[hitIndex];
 				float3 rayHitLocation = thisHitMeta.hitLocation;
 				float visibilityTolerance = optixLaunchParameters.rayHit.visibilityTolerance;
@@ -194,9 +187,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 /// Miss program
 extern "C" __global__ void __miss__radiance() {
-	if (optixLaunchParameters.mutation.index ==
-	    optixLaunchParameters.frame.frameBufferSize.x *
-	    optixLaunchParameters.frame.frameBufferSize.y) { // Visibility check operation
+	if (optixLaunchParameters.systemState[0] == optixLaunchParameters.mutation.numberOfThem) { // Visibility check operation
 		const unsigned int ix = optixGetLaunchIndex().x;
 		const unsigned int iy = optixGetLaunchIndex().y;
 		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
@@ -217,9 +208,7 @@ extern "C" __global__ void __closesthit__radiance() {
 	const float3 hitLocation = make_float3(rayOrigin.x + rayLength * rayDir.x, rayOrigin.y + rayLength * rayDir.y,
 	                                       rayOrigin.z + rayLength * rayDir.z);
 
-	if (optixLaunchParameters.mutation.index <
-	    optixLaunchParameters.frame.frameBufferSize.x *
-	    optixLaunchParameters.frame.frameBufferSize.y) { // Trace operation
+	if (optixLaunchParameters.systemState[0] < optixLaunchParameters.mutation.numberOfThem) { // Trace operation
 		if (sbtData.kind == Mesh) {
 			// Compute surface normal
 			const int primitiveIndex = optixGetPrimitiveIndex();
@@ -237,12 +226,13 @@ extern "C" __global__ void __closesthit__radiance() {
 
 			// Create hit meta
 			RayHitMeta thisHitMeta = {hitLocation, rayOrigin, Ng, rayLength, 1,
-			                          optixLaunchParameters.rayHit.startFromScreen, optixLaunchParameters.rayHit.index,
+			                          optixLaunchParameters.systemState[2] == 1, optixLaunchParameters.systemState[1],
 			                          cosDN};
-			optixLaunchParameters.rayHit.index++;
-			optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index] = thisHitMeta;
-			if (optixLaunchParameters.rayHit.startFromScreen) {
-				optixLaunchParameters.rayHit.startFromScreen = false;
+			optixLaunchParameters.systemState[1]++;
+			optixLaunchParameters.rayHit.metas[optixLaunchParameters.systemState[1]] = thisHitMeta;
+			if (optixLaunchParameters.systemState[2]) {
+				printf("First hit!\n");
+				optixLaunchParameters.systemState[2] = 0;
 			}
 
 			// Debug prints
@@ -253,7 +243,8 @@ extern "C" __global__ void __closesthit__radiance() {
 			printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y,
 			       hitLocation.z);// Set ray hit meta values
 		} else {
-			optixLaunchParameters.rayHit.startFromScreen = true;
+			printf("Hit a light!\n");
+			optixLaunchParameters.systemState[2] = 1;
 			// Distribute energy here
 		}
 
