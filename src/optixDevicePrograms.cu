@@ -67,7 +67,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 		/// Generate random ray direction
 		// Get random number set
 		const float3 &mutationNumbersSet = optixLaunchParameters.mutation.numbers[optixLaunchParameters.mutation.index];
-		if (optixLaunchParameters.rayHit.startFromScreen) { // So start from screen
+		if (optixLaunchParameters.rayHit.startFromScreen) {
 			const unsigned int randScreenX = llrintf(
 				mutationNumbersSet.x * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1));
 			const unsigned int randScreenY = llrintf(
@@ -102,7 +102,14 @@ extern "C" __global__ void __raygen__renderFrame() {
 			                                     newRayDirRaw.y * rayDirInverseMagnitude + sourceRayMeta.hitNormal.y,
 			                                     newRayDirRaw.z * rayDirInverseMagnitude + sourceRayMeta.hitNormal.z);
 		}
-		optixLaunchParameters.mutation.index++;
+		printf("Pre inc\n");
+		optixLaunchParameters.frame.visibleLocations[0] = make_float3(8, 7, 6);
+		printf("Cur Inc: %lu\n", optixLaunchParameters.mutation.index);
+		printf("New X: %f\n", optixLaunchParameters.frame.visibleLocations[0].x);
+		optixLaunchParameters.mutation.index = 1;
+		printf("Manual Inc\n");
+		optixLaunchParameters.mutation.index += 1;
+		printf("Post inc\n");
 
 		// Optix Trace
 		optixTrace(optixLaunchParameters.optixTraversableHandle,
@@ -158,20 +165,40 @@ extern "C" __global__ void __raygen__renderFrame() {
 		           payload0,
 		           payload1);
 
+		// Loop through recorded hits
+		const unsigned int frameIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
+		float3 visibilityHitLocation = optixLaunchParameters.frame.visibleLocations[frameIndex];
+
+		if (visibilityHitLocation.x != nanf("")) {
+			for (unsigned int hitIndex = 0; hitIndex <= optixLaunchParameters.rayHit.index; ++hitIndex) {
+				RayHitMeta thisHitMeta = optixLaunchParameters.rayHit.metas[hitIndex];
+				float3 rayHitLocation = thisHitMeta.hitLocation;
+				float visibilityTolerance = optixLaunchParameters.rayHit.visibilityTolerance;
+				bool inXRange = fdimf(visibilityHitLocation.x, rayHitLocation.x) < visibilityTolerance;
+				bool inYRange = fdimf(visibilityHitLocation.y, rayHitLocation.y) < visibilityTolerance;
+				bool inZRange = fdimf(visibilityHitLocation.z, rayHitLocation.z) < visibilityTolerance;
+
+				if (inXRange && inYRange && inZRange) {
+					float energy = thisHitMeta.energy;
+					pixelColorPerRayData = {pixelColorPerRayData.r * energy, pixelColorPerRayData.g * energy,
+					                        pixelColorPerRayData.b * energy};
+					break;
+				}
+			}
+		}
+
 		// Record data
-		const unsigned int colorBufferIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
-		optixLaunchParameters.frame.frameColorBuffer[colorBufferIndex] = pixelColorPerRayData;
+		optixLaunchParameters.frame.frameColorBuffer[frameIndex] = pixelColorPerRayData;
 	}
 }
 
 /// Miss program
 extern "C" __global__ void __miss__radiance() {
-	const unsigned int ix = optixGetLaunchIndex().x;
-	const unsigned int iy = optixGetLaunchIndex().y;
-
-	if (optixLaunchParameters.mutation.index <
+	if (optixLaunchParameters.mutation.index ==
 	    optixLaunchParameters.frame.frameBufferSize.x *
 	    optixLaunchParameters.frame.frameBufferSize.y) { // Visibility check operation
+		const unsigned int ix = optixGetLaunchIndex().x;
+		const unsigned int iy = optixGetLaunchIndex().y;
 		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 		optixLaunchParameters.frame.visibleLocations[visibleIndex] = make_float3(nanf(""), nanf(""), nanf(""));
 	}
@@ -192,39 +219,50 @@ extern "C" __global__ void __closesthit__radiance() {
 
 	if (optixLaunchParameters.mutation.index <
 	    optixLaunchParameters.frame.frameBufferSize.x *
-	    optixLaunchParameters.frame.frameBufferSize.y) { // Visibility check operation
+	    optixLaunchParameters.frame.frameBufferSize.y) { // Trace operation
+		if (sbtData.kind == Mesh) {
+			// Compute surface normal
+			const int primitiveIndex = optixGetPrimitiveIndex();
+			const int3 index = sbtData.index[primitiveIndex];
+			const float3 &vertexA = sbtData.vertex[index.x];
+			const float3 &vertexB = sbtData.vertex[index.y];
+			const float3 &vertexC = sbtData.vertex[index.z];
+
+			auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
+			auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
+			const float3 Ng = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
+
+			// "NdotD" shading
+			const float cosDN = 0.2f + 0.8f * fabsf(vectorDotProductGPU(rayDir, Ng));
+
+			// Create hit meta
+			RayHitMeta thisHitMeta = {hitLocation, rayOrigin, Ng, rayLength, 1,
+			                          optixLaunchParameters.rayHit.startFromScreen, optixLaunchParameters.rayHit.index,
+			                          cosDN};
+			optixLaunchParameters.rayHit.index++;
+			optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index] = thisHitMeta;
+			if (optixLaunchParameters.rayHit.startFromScreen) {
+				optixLaunchParameters.rayHit.startFromScreen = false;
+			}
+
+			// Debug prints
+			printf("Hit for 480, 270\n");// Calculate hit hitLocation
+			printf("Ray Origin:\t\t%f, %f, %f\n", rayOrigin.x, rayOrigin.y, rayOrigin.z);
+			printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
+			printf("Ray Length:\t\t%f\n", rayLength);
+			printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y,
+			       hitLocation.z);// Set ray hit meta values
+		} else {
+			optixLaunchParameters.rayHit.startFromScreen = true;
+			// Distribute energy here
+		}
+
+	} else { // Visibility check operation
 		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 		optixLaunchParameters.frame.visibleLocations[visibleIndex] = hitLocation;
-	} else { // Trace operation
-		// Compute surface normal
-		const int primitiveIndex = optixGetPrimitiveIndex();
-		const int3 index = sbtData.index[primitiveIndex];
-		const float3 &vertexA = sbtData.vertex[index.x];
-		const float3 &vertexB = sbtData.vertex[index.y];
-		const float3 &vertexC = sbtData.vertex[index.z];
 
-		auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
-		auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
-		const float3 Ng = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
-
-		// "NdotD" shading
-		const float cosDN = 0.2f + 0.8f * fabsf(vectorDotProductGPU(rayDir, Ng));
 		colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
-		perRayData = {cosDN * sbtData.color.r, cosDN * sbtData.color.g, cosDN * sbtData.color.b};
-
-		// Create hit meta
-		RayHitMeta thisHitMeta = {hitLocation, rayOrigin, Ng, rayLength, 1,
-		                          optixLaunchParameters.rayHit.startFromScreen, optixLaunchParameters.rayHit.index, 1};
-		optixLaunchParameters.rayHit.index++;
-		optixLaunchParameters.rayHit.metas[optixLaunchParameters.rayHit.index] = thisHitMeta;
-
-		// Debug prints
-		printf("Hit for 480, 270\n");// Calculate hit hitLocation
-		printf("Ray Origin:\t\t%f, %f, %f\n", rayOrigin.x, rayOrigin.y, rayOrigin.z);
-		printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
-		printf("Ray Length:\t\t%f\n", rayLength);
-		printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y, hitLocation.z);// Set ray hit meta values
-		printf("Mesh Kind:\t%s", (sbtData.kind == Mesh ? "Mesh" : "Light"));
+		perRayData = {sbtData.color.r, sbtData.color.g, sbtData.color.b};
 	}
 }
 extern "C" __global__ void __anyhit__radiance() {}

@@ -24,7 +24,7 @@ struct RayHitMeta {
 	unsigned long visits; // For detailed balance
 	bool isRootRay;
 	unsigned long sourceRayIndex; // Subsequent rays from this point
-	int energy; // Brightness
+	float energy; // Brightness
 };
 
 struct OptixLaunchParameters {
@@ -47,6 +47,7 @@ struct OptixLaunchParameters {
 
 	struct {
 		bool startFromScreen = true;
+		float visibilityTolerance = 0.01;
 		unsigned long index = 0;
 		RayHitMeta *metas{};
 	} rayHit;
