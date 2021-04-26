@@ -13,6 +13,7 @@ struct TriangleMeshSBTData {
 	float3 *vertex{};
 	int3 *index{}; // triangle vertices indices
 	colorVector color;
+	float energy = 1;
 	MeshKind kind{};
 };
 

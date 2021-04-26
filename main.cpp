@@ -105,6 +105,8 @@ extern "C" int main() {
 	raytracing.optixRender();
 	raytracing.downloadRender(pixData);
 
+	cout << pixData[0] << ", " << pixData[1] << ", " << pixData[2] << ", " << pixData[3] << endl;
+
 
 	//// SECTION: Convert and send data
 	com.ConvertAndSend(pixData, pixDataByteSize);

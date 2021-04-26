@@ -472,7 +472,7 @@ void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {
-	auto magnitude = static_cast<float>(sqrt(pow(vector.x, 2) + pow(vector.y, 2) + pow(vector.z, 2)));
+	auto magnitude = static_cast<float>(sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z));
 
 	return make_float3(vector.x / magnitude, vector.y / magnitude, vector.z / magnitude);
 }
