@@ -91,16 +91,24 @@ extern "C" __global__ void __raygen__renderFrame() {
 			rayOrigin = camera.position;
 			rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
 		} else {
-			const float3 newRayDirRaw = make_float3(cospif(mutationNumbersSet.x), cospif(mutationNumbersSet.y),
-			                                        cospif(mutationNumbersSet.z));
-			const float rayDirInverseMagnitude = rnorm3df(newRayDirRaw.x, newRayDirRaw.y, newRayDirRaw.z);
 			RayHitMeta sourceRayMeta = optixLaunchParameters.rayHit.metas[optixLaunchParameters.systemState[RayHitMetaIndex]];
 
+			const float3 newRayDirRaw = make_float3(sourceRayMeta.hitNormal.x - cospif(mutationNumbersSet.x),
+			                                        sourceRayMeta.hitNormal.y - cospif(mutationNumbersSet.y),
+			                                        sourceRayMeta.hitNormal.z - cospif(mutationNumbersSet.z / 2));
+			const float rayDirInverseMagnitude = rnorm3df(newRayDirRaw.x, newRayDirRaw.y, newRayDirRaw.z);
+
 			rayOrigin = sourceRayMeta.hitLocation;
-			rayDirectionNormalized = make_float3(newRayDirRaw.x * rayDirInverseMagnitude + sourceRayMeta.hitNormal.x,
-			                                     newRayDirRaw.y * rayDirInverseMagnitude + sourceRayMeta.hitNormal.y,
-			                                     newRayDirRaw.z * rayDirInverseMagnitude + sourceRayMeta.hitNormal.z);
+			rayDirectionNormalized = make_float3(newRayDirRaw.x * rayDirInverseMagnitude,
+			                                     newRayDirRaw.y * rayDirInverseMagnitude,
+			                                     newRayDirRaw.z * rayDirInverseMagnitude);
 		}
+
+//		if (optixLaunchParameters.systemState[MutationIndex] == 2) {
+//			printf("First Direction: <%f, %f, %f>\n", rayDirectionNormalized.x, rayDirectionNormalized.y,
+//			       rayDirectionNormalized.z);
+//		}
+
 		optixLaunchParameters.systemState[MutationIndex]++;
 
 		// Optix Trace
@@ -207,6 +215,13 @@ extern "C" __global__ void __closesthit__radiance() {
 	const float3 rayDir = optixGetWorldRayDirection();
 	const float3 rayOrigin = optixGetWorldRayOrigin();
 	const float rayLength = optixGetRayTmax();
+
+	// Check if valid hit
+	if (rayLength <= 0.0001) { // Basically 0
+		printf("No ray length, skipping\n");
+		return;
+	}
+
 	const float3 hitLocation = make_float3(rayOrigin.x + rayLength * rayDir.x, rayOrigin.y + rayLength * rayDir.y,
 	                                       rayOrigin.z + rayLength * rayDir.z);
 
@@ -225,35 +240,49 @@ extern "C" __global__ void __closesthit__radiance() {
 	                             optixLaunchParameters.systemState[StartFromCameraBool] == 1,
 	                             optixLaunchParameters.systemState[RayHitMetaIndex]};
 
+
+//	if (rayLength < 1) {
+//		printf("Less than 1 rayLength: %f, %lu, %lu, (%f, %f, %f)\n", rayLength,
+//		       optixLaunchParameters.systemState[MutationIndex],
+//		       optixLaunchParameters.systemState[RayHitMetaIndex], hitLocation.x, hitLocation.y, hitLocation.z);
+//	}
+
 	if (optixLaunchParameters.systemState[MutationIndex] <
 	    optixLaunchParameters.mutation.numberOfThem) { // Trace operation
 		if (sbtData.kind == Mesh) {
-//			// "NdotD" shading
-//			const float cosDN = 0.2f + 0.8f * fabsf(vectorDotProductGPU(rayDir, surfaceNormal));
-//
-//			// Add energy and add to metas
-//			thisRayHitMeta.energy = cosDN;
-
 			if (!optixLaunchParameters.systemState[RayHitMetaIndex] &&
 			    optixLaunchParameters.systemState[StartFromCameraBool]) { // If == 0 and start from camera
+//				printf(
+//					"Index: %lu, Camera: %lu, Mutation: %lu | Ray Origin: (%f, %f, %f) | Hit Location: (%f, %f, %f) | Hit Normal: (%f, %f, %f)\n",
+//					optixLaunchParameters.systemState[RayHitMetaIndex],
+//					optixLaunchParameters.systemState[StartFromCameraBool],
+//					optixLaunchParameters.systemState[MutationIndex], rayOrigin.x, rayOrigin.y, rayOrigin.z,
+//					hitLocation.x, hitLocation.y, hitLocation.z, surfaceNormal.x, surfaceNormal.y, surfaceNormal.z);
+
 				optixLaunchParameters.rayHit.metas[0] = thisRayHitMeta;
 			} else {
+//				if (optixLaunchParameters.systemState[RayHitMetaIndex] == 0) {
+//					printf(
+//						"Index: %lu, Camera: %lu, Mutation: %lu | Hit Location: (%f, %f, %f) | ray direction: (%f, %f, %f)\n",
+//						optixLaunchParameters.systemState[RayHitMetaIndex],
+//						optixLaunchParameters.systemState[StartFromCameraBool],
+//						optixLaunchParameters.systemState[MutationIndex], hitLocation.x, hitLocation.y,
+//						hitLocation.z, rayDir.x, rayDir.y, rayDir.z);
+//				}
 				optixLaunchParameters.systemState[RayHitMetaIndex]++;
 				optixLaunchParameters.rayHit.metas[optixLaunchParameters.systemState[RayHitMetaIndex]] = thisRayHitMeta;
+//				if (optixLaunchParameters.systemState[RayHitMetaIndex] == 1) {
+//					printf("From: (%f, %f, %f), Source Index: %lu | hit length: %f\n", thisRayHitMeta.from.x,
+//					       thisRayHitMeta.from.y,
+//					       thisRayHitMeta.from.z, thisRayHitMeta.sourceRayIndex, rayLength);
+//				}
 			}
 
 			if (optixLaunchParameters.systemState[StartFromCameraBool]) {
 				optixLaunchParameters.systemState[StartFromCameraBool] = 0;
 			}
-
-			// Debug prints
-//			printf("Hit for 480, 270\n");// Calculate hit hitLocation
-//			printf("Ray Origin:\t\t%f, %f, %f\n", rayOrigin.x, rayOrigin.y, rayOrigin.z);
-//			printf("Ray Direction:\t%f, %f, %f\n", rayDir.x, rayDir.y, rayDir.z);
-//			printf("Ray Length:\t\t%f\n", rayLength);
-//			printf("Hit Location:\t%f, %f, %f\n", hitLocation.x, hitLocation.y,
-//			       hitLocation.z);// Set ray hit meta values
 		} else { // Hit a light source
+//			printf("Hit Light at ray#%lu\n", optixLaunchParameters.systemState[RayHitMetaIndex]);
 			// Directly apply if root ray
 			if (optixLaunchParameters.systemState[StartFromCameraBool]) {
 				thisRayHitMeta.energy = sbtData.energy / (rayLength * rayLength); // 1 / r^2
@@ -275,7 +304,7 @@ extern "C" __global__ void __closesthit__radiance() {
 				while (!optixLaunchParameters.rayHit.metas[metaSearchIndex].isRootRay) {
 					// Calculate 1 / r^2 from energy
 					float searchedMetaRayLength = optixLaunchParameters.rayHit.metas[metaSearchIndex].rayLength;
-					lastEnergy = lastEnergy / (searchedMetaRayLength * searchedMetaRayLength);
+					lastEnergy /= (searchedMetaRayLength * searchedMetaRayLength);
 					// Set as energy
 					optixLaunchParameters.rayHit.metas[metaSearchIndex].energy = lastEnergy;
 					// Set next search index
