@@ -46,10 +46,7 @@ struct OptixLaunchParameters {
 		float3 *numbers{};
 	} mutation;
 
-	struct {
-		float visibilityTolerance = 0.005;
-		RayHitMeta *metas{};
-	} rayHit;
+	RayHitMeta *rayHitMetas{};
 
 	unsigned long *systemState{}; // Mutation index, RayHitMeta index, Start from screen bool
 };

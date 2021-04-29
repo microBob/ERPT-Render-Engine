@@ -33,7 +33,8 @@ struct TriangleMesh {
 //// SECTION: Class definition
 class Raytracing {
 public:
-	void initOptix(vector<TriangleMesh> &meshes, size_t numMutations);
+	void
+	initOptix(vector<TriangleMesh> &meshes, size_t numMutations, unsigned long missLimit, unsigned int visibilityTolerance);
 
 	void setFrameSize(const uint2 &newSize);
 
@@ -65,7 +66,8 @@ protected:
 	OptixTraversableHandle buildAccelerationStructure(vector<TriangleMesh> &meshes);
 
 	// Rendering mutation (random) number
-	void generateMutationNumbers(size_t numMutations, unsigned long long int seed = 0);
+	void generateMutationNumbers(size_t numMutations, unsigned long long int seed, unsigned long missLimit,
+	                             unsigned int visibilityTolerance);
 
 private:
 	static float3 normalizedVector(float3 vector);

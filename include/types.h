@@ -21,7 +21,10 @@ enum MeshKind {
 enum OptiXStateIndex {
 	MutationIndex,
 	RayHitMetaIndex,
-	StartFromCameraBool
+	StartFromCameraBool,
+	MissCount,
+	MissLimit,
+	VisibilityTolerance
 };
 
 #endif //ERPT_RENDER_ENGINE_TYPES_H

@@ -5,7 +5,8 @@
 // Created by microbobu on 2/15/21.
 //
 
-void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numMutations) {
+void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numMutations, unsigned long missLimit,
+                           unsigned int visibilityTolerance) {
 	/// Initialize Optix library
 	// Reset and prep CUDA
 	cudaFree(nullptr);
@@ -36,7 +37,7 @@ void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numMutations) {
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(meshes);
 	// Generate mutation numbers
 	numberOfMutations = numMutations;
-	generateMutationNumbers(numMutations);
+	generateMutationNumbers(numMutations, 0, missLimit, visibilityTolerance);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -430,7 +431,8 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure(vector<TriangleMes
 	return accelerationStructureHandle;
 }
 
-void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long int seed) {
+void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long int seed, unsigned long missLimit,
+                                         unsigned int visibilityTolerance) {
 	// Setup
 	curandGenerator_t gen;
 	float *deviceNumbers, *hostNumbers;
@@ -463,10 +465,11 @@ void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long
 
 	// Also create ray hit meta buffer
 	rayHitMetasBuffer.resize(numMutations * sizeof(RayHitMeta));
-	optixLaunchParameters.rayHit.metas = static_cast<RayHitMeta *>(rayHitMetasBuffer.d_ptr);
+	optixLaunchParameters.rayHitMetas = static_cast<RayHitMeta *>(rayHitMetasBuffer.d_ptr);
 
 	// Also create system state
-	vector<unsigned long> systemStateVector{0, 0, 1}; // mutation index, rayHitMeta index, start from screen
+	vector<unsigned long> systemStateVector{0, 0, 1, 0, missLimit,
+	                                        visibilityTolerance}; // mutation index, rayHitMeta index, start from screen
 	systemStateBuffer.alloc_and_upload(systemStateVector);
 	optixLaunchParameters.systemState = static_cast<unsigned long *>(systemStateBuffer.d_ptr);
 }

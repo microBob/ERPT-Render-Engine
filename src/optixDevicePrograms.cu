@@ -91,7 +91,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 			rayOrigin = camera.position;
 			rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
 		} else {
-			RayHitMeta sourceRayMeta = optixLaunchParameters.rayHit.metas[optixLaunchParameters.systemState[RayHitMetaIndex]];
+			RayHitMeta sourceRayMeta = optixLaunchParameters.rayHitMetas[optixLaunchParameters.systemState[RayHitMetaIndex]];
 
 			const float3 newRayDirRaw = make_float3(sourceRayMeta.hitNormal.x - cospif(mutationNumbersSet.x),
 			                                        sourceRayMeta.hitNormal.y - cospif(mutationNumbersSet.y),
@@ -130,6 +130,8 @@ extern "C" __global__ void __raygen__renderFrame() {
 		packPointer(&pixelColorPerRayData, payload0, payload1);
 
 		// Creating screen ray
+		// TODO: use ix , iy as index of random numbers to pull from
+		//
 		const auto screen = make_float2(
 			(static_cast<float>(ix) + 0.5f) /
 			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
@@ -154,7 +156,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 		optixTrace(optixLaunchParameters.optixTraversableHandle,
 		           rayOrigin,
 		           rayDirectionNormalized,
-		           0.f,
+		           0.f, // TODO: this is tmax
 		           1e20f,
 		           0.0f,
 		           OptixVisibilityMask(255),
@@ -173,9 +175,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 		if (visibilityHitLocation.x != nanf("")) {
 			for (unsigned int hitIndex = 0;
 			     hitIndex <= optixLaunchParameters.systemState[RayHitMetaIndex]; ++hitIndex) {
-				RayHitMeta thisHitMeta = optixLaunchParameters.rayHit.metas[hitIndex];
+				RayHitMeta thisHitMeta = optixLaunchParameters.rayHitMetas[hitIndex];
 				float3 rayHitLocation = thisHitMeta.hitLocation;
-				float visibilityTolerance = optixLaunchParameters.rayHit.visibilityTolerance;
+				float visibilityTolerance = 1 / static_cast<float>(optixLaunchParameters.systemState[VisibilityTolerance]);
 				bool inXRange = fdimf(visibilityHitLocation.x, rayHitLocation.x) < visibilityTolerance;
 				bool inYRange = fdimf(visibilityHitLocation.y, rayHitLocation.y) < visibilityTolerance;
 				bool inZRange = fdimf(visibilityHitLocation.z, rayHitLocation.z) < visibilityTolerance;
@@ -202,6 +204,8 @@ extern "C" __global__ void __miss__radiance() {
 		const unsigned int iy = optixGetLaunchIndex().y;
 		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 		optixLaunchParameters.frame.visibleLocations[visibleIndex] = make_float3(nanf(""), nanf(""), nanf(""));
+	} else {
+		// TODO: add to miss try counter, reset to camera if over limit
 	}
 }
 
@@ -259,7 +263,7 @@ extern "C" __global__ void __closesthit__radiance() {
 //					optixLaunchParameters.systemState[MutationIndex], rayOrigin.x, rayOrigin.y, rayOrigin.z,
 //					hitLocation.x, hitLocation.y, hitLocation.z, surfaceNormal.x, surfaceNormal.y, surfaceNormal.z);
 
-				optixLaunchParameters.rayHit.metas[0] = thisRayHitMeta;
+				optixLaunchParameters.rayHitMetas[0] = thisRayHitMeta;
 			} else {
 //				if (optixLaunchParameters.systemState[RayHitMetaIndex] == 0) {
 //					printf(
@@ -270,7 +274,7 @@ extern "C" __global__ void __closesthit__radiance() {
 //						hitLocation.z, rayDir.x, rayDir.y, rayDir.z);
 //				}
 				optixLaunchParameters.systemState[RayHitMetaIndex]++;
-				optixLaunchParameters.rayHit.metas[optixLaunchParameters.systemState[RayHitMetaIndex]] = thisRayHitMeta;
+				optixLaunchParameters.rayHitMetas[optixLaunchParameters.systemState[RayHitMetaIndex]] = thisRayHitMeta;
 //				if (optixLaunchParameters.systemState[RayHitMetaIndex] == 1) {
 //					printf("From: (%f, %f, %f), Source Index: %lu | hit length: %f\n", thisRayHitMeta.from.x,
 //					       thisRayHitMeta.from.y,
@@ -289,10 +293,10 @@ extern "C" __global__ void __closesthit__radiance() {
 
 				if (!optixLaunchParameters.systemState[RayHitMetaIndex] &&
 				    optixLaunchParameters.systemState[StartFromCameraBool]) { // If == 0 and start from camera
-					optixLaunchParameters.rayHit.metas[0] = thisRayHitMeta;
+					optixLaunchParameters.rayHitMetas[0] = thisRayHitMeta;
 				} else {
 					optixLaunchParameters.systemState[RayHitMetaIndex]++;
-					optixLaunchParameters.rayHit.metas[optixLaunchParameters.systemState[RayHitMetaIndex]] = thisRayHitMeta;
+					optixLaunchParameters.rayHitMetas[optixLaunchParameters.systemState[RayHitMetaIndex]] = thisRayHitMeta;
 				}
 			} else {
 				// Reset next ray back to camera
@@ -301,14 +305,14 @@ extern "C" __global__ void __closesthit__radiance() {
 				unsigned long metaSearchIndex = optixLaunchParameters.systemState[RayHitMetaIndex];
 				float lastEnergy = sbtData.energy; // Set energy to distribute
 				// Loop through source rays until hit root
-				while (!optixLaunchParameters.rayHit.metas[metaSearchIndex].isRootRay) {
+				while (!optixLaunchParameters.rayHitMetas[metaSearchIndex].isRootRay) {
 					// Calculate 1 / r^2 from energy
-					float searchedMetaRayLength = optixLaunchParameters.rayHit.metas[metaSearchIndex].rayLength;
+					float searchedMetaRayLength = optixLaunchParameters.rayHitMetas[metaSearchIndex].rayLength;
 					lastEnergy /= (searchedMetaRayLength * searchedMetaRayLength);
 					// Set as energy
-					optixLaunchParameters.rayHit.metas[metaSearchIndex].energy = lastEnergy;
+					optixLaunchParameters.rayHitMetas[metaSearchIndex].energy = lastEnergy;
 					// Set next search index
-					metaSearchIndex = optixLaunchParameters.rayHit.metas[metaSearchIndex].sourceRayIndex;
+					metaSearchIndex = optixLaunchParameters.rayHitMetas[metaSearchIndex].sourceRayIndex;
 				}
 			}
 		}
