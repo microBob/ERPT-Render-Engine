@@ -17,10 +17,4 @@ enum MeshKind {
 	Mesh,
 	Light
 };
-
-enum OptiXStateIndex {
-	TotalNumberOfSamples,
-	SampleIndex
-};
-
 #endif //ERPT_RENDER_ENGINE_TYPES_H

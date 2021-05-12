@@ -53,167 +53,138 @@ static __forceinline__ __device__ T *getPerRayData() {
 /// Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
-	const unsigned int ix = optixGetLaunchIndex().x;
-	const unsigned int iy = optixGetLaunchIndex().y;
+	const unsigned int thisRayIndex =
+		optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixLaunchParameters.frame.frameBufferSize.x;
 	const auto &camera = optixLaunchParameters.camera;
 
-	// Ray information storage
-	float3 rayOrigin; // Where the ray starts
-	float3 rayDirectionNormalized; // Where the ray goes
+	/// Starting ray from camera
+	// Create per ray data
+	PerRayData rayData;
+	uint32_t payload0, payload1;
+	packPointer(&rayData, payload0, payload1);
 
-	if (optixLaunchParameters.systemState[MutationIndex] <
-	    optixLaunchParameters.mutation.numberOfThem) { // Still have mutations = rendering
-		/// Generate random ray direction
-		// Get random number set
-		const float3 &mutationNumbersSet = optixLaunchParameters.mutation.numbers[optixLaunchParameters.systemState[MutationIndex]];
-		if (optixLaunchParameters.systemState[StartFromCameraBool]) {
-			const unsigned int randScreenX = llrintf(
-				mutationNumbersSet.x * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1));
-			const unsigned int randScreenY = llrintf(
-				mutationNumbersSet.y * static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y - 1));
-			const auto screen = make_float2(
-				(static_cast<float>(randScreenX) + 0.5f) /
-				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-				(static_cast<float>(randScreenY) + 0.5f) /
-				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
-			auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
-			auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
-			                                              screenMinus.x * camera.horizontal.y,
-			                                              screenMinus.x * camera.horizontal.z);
-			auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
-			                                            screenMinus.y * camera.vertical.y,
-			                                            screenMinus.y * camera.vertical.z);
-			auto rawRayDirection = make_float3(
-				camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
-				camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
-				camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
+	// Create screen ray
+	const auto screen = make_float2(
+		(static_cast<float>(thisRayIndex) + 0.5f) /
+		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
+		(static_cast<float>(thisRayIndex + 1) + 0.5f) /
+		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
+	auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
+	                                              screenMinus.x * camera.horizontal.y,
+	                                              screenMinus.x * camera.horizontal.z);
+	auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
+	                                            screenMinus.y * camera.vertical.y,
+	                                            screenMinus.y * camera.vertical.z);
+	auto rawRayDirection = make_float3(
+		camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
+		camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
+		camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
 
-			rayOrigin = camera.position;
-			rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
-		} else {
-			RayHitMeta sourceRayMeta = optixLaunchParameters.rayHitMetas[optixLaunchParameters.systemState[RayHitMetaIndex]];
+	float3 rayOrigin = camera.position;
+	float3 rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
 
-			const float3 newRayDirRaw = make_float3(sourceRayMeta.hitNormal.x - cospif(mutationNumbersSet.x),
-			                                        sourceRayMeta.hitNormal.y - cospif(mutationNumbersSet.y),
-			                                        sourceRayMeta.hitNormal.z - cospif(mutationNumbersSet.z / 2));
-			const float rayDirInverseMagnitude = rnorm3df(newRayDirRaw.x, newRayDirRaw.y, newRayDirRaw.z);
+	// Trace
+	optixTrace(optixLaunchParameters.optixTraversableHandle,
+	           rayOrigin,
+	           rayDirectionNormalized,
+	           0.001f, // Needs to have gone somewhere
+	           1e20f,
+	           0.0f,
+	           OptixVisibilityMask(255),
+	           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+	           SURFACE_RAY_TYPE,
+	           RAY_TYPE_COUNT,
+	           SURFACE_RAY_TYPE,
+	           payload0,
+	           payload1);
 
-			rayOrigin = sourceRayMeta.hitLocation;
-			rayDirectionNormalized = make_float3(newRayDirRaw.x * rayDirInverseMagnitude,
-			                                     newRayDirRaw.y * rayDirInverseMagnitude,
-			                                     newRayDirRaw.z * rayDirInverseMagnitude);
-		}
+	colorVector baseColor;
+	if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
+		baseColor = rayData.color; // Set base color
 
-//		if (optixLaunchParameters.systemState[MutationIndex] == 2) {
-//			printf("First Direction: <%f, %f, %f>\n", rayDirectionNormalized.x, rayDirectionNormalized.y,
-//			       rayDirectionNormalized.z);
-//		}
+		// Increment Energy at pixel if a light source was hit
+		if (rayData.light) {
+			optixLaunchParameters.energyPerPixel[thisRayIndex]++;
+		} else { // Else, continue with second ray
+			/// Second ray
+			// Create ray
+			const auto newRay = make_float3(cospif(optixLaunchParameters.mutationNumbers[thisRayIndex + 2]),
+			                                cospif(optixLaunchParameters.mutationNumbers[thisRayIndex + 3]),
+			                                fabsf(cospif(optixLaunchParameters.mutationNumbers[thisRayIndex + 4])));
+			// Transform into reflection coordinate system
+			const auto transformedNewRay = make_float3(
+				(-newRay.x * (rayData.normal.y * rayData.yAxis.z - rayData.normal.z * rayData.yAxis.y) +
+				 newRay.y * (rayData.normal.x * rayData.yAxis.z - rayData.normal.z * rayData.yAxis.x) -
+				 newRay.z * (rayData.normal.x * rayData.yAxis.y - rayData.normal.y * rayData.yAxis.x)) /
+				(rayData.normal.x * rayData.xAxis.y * rayData.yAxis.z -
+				 rayData.normal.x * rayData.xAxis.z * rayData.yAxis.y -
+				 rayData.normal.y * rayData.xAxis.x * rayData.yAxis.z +
+				 rayData.normal.y * rayData.xAxis.z * rayData.yAxis.x +
+				 rayData.normal.z * rayData.xAxis.x * rayData.yAxis.y -
+				 rayData.normal.z * rayData.xAxis.y * rayData.yAxis.x),
+				(newRay.x * (rayData.normal.y * rayData.xAxis.z - rayData.normal.z * rayData.xAxis.y) -
+				 newRay.y * (rayData.normal.x * rayData.xAxis.z - rayData.normal.z * rayData.xAxis.x) +
+				 newRay.z * (rayData.normal.x * rayData.xAxis.y - rayData.normal.y * rayData.xAxis.x)) /
+				(rayData.normal.x * rayData.xAxis.y * rayData.yAxis.z -
+				 rayData.normal.x * rayData.xAxis.z * rayData.yAxis.y -
+				 rayData.normal.y * rayData.xAxis.x * rayData.yAxis.z +
+				 rayData.normal.y * rayData.xAxis.z * rayData.yAxis.x +
+				 rayData.normal.z * rayData.xAxis.x * rayData.yAxis.y -
+				 rayData.normal.z * rayData.xAxis.y * rayData.yAxis.x),
+				(newRay.x * (rayData.xAxis.y * rayData.yAxis.z - rayData.xAxis.z * rayData.yAxis.y) -
+				 newRay.y * (rayData.xAxis.x * rayData.yAxis.z - rayData.xAxis.z * rayData.yAxis.x) +
+				 newRay.z * (rayData.xAxis.x * rayData.yAxis.y - rayData.xAxis.y * rayData.yAxis.x)) /
+				(rayData.normal.x * rayData.xAxis.y * rayData.yAxis.z -
+				 rayData.normal.x * rayData.xAxis.z * rayData.yAxis.y -
+				 rayData.normal.y * rayData.xAxis.x * rayData.yAxis.z +
+				 rayData.normal.y * rayData.xAxis.z * rayData.yAxis.x +
+				 rayData.normal.z * rayData.xAxis.x * rayData.yAxis.y -
+				 rayData.normal.z * rayData.xAxis.y * rayData.yAxis.x));
 
-		optixLaunchParameters.systemState[MutationIndex]++;
+			rayOrigin = rayData.location;
+			rayDirectionNormalized = normalizeVectorGPU(transformedNewRay);
 
-		// Optix Trace
-		optixTrace(optixLaunchParameters.optixTraversableHandle,
-		           rayOrigin,
-		           rayDirectionNormalized,
-		           0.f,
-		           1e20f,
-		           0.0f,
-		           OptixVisibilityMask(255),
-		           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-		           SURFACE_RAY_TYPE,
-		           RAY_TYPE_COUNT,
-		           SURFACE_RAY_TYPE);
-	} else { // Done rendering and is now checking for visibility
-		// Create per ray data pointer
-		colorVector pixelColorPerRayData;
-		uint32_t payload0, payload1;
-		packPointer(&pixelColorPerRayData, payload0, payload1);
+			// Trace
+			optixTrace(optixLaunchParameters.optixTraversableHandle,
+			           rayOrigin,
+			           rayDirectionNormalized,
+			           0.001f, // Needs to have gone somewhere
+			           1e20f,
+			           0.0f,
+			           OptixVisibilityMask(255),
+			           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+			           SURFACE_RAY_TYPE,
+			           RAY_TYPE_COUNT,
+			           SURFACE_RAY_TYPE,
+			           payload0,
+			           payload1);
 
-		// Creating screen ray
-		// TODO: use ix , iy as index of random numbers to pull from
-		//
-		const auto screen = make_float2(
-			(static_cast<float>(ix) + 0.5f) /
-			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-			(static_cast<float>(iy) + 0.5f) /
-			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
-		auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
-		auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
-		                                              screenMinus.x * camera.horizontal.y,
-		                                              screenMinus.x * camera.horizontal.z);
-		auto verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
-		                                            screenMinus.y * camera.vertical.y,
-		                                            screenMinus.y * camera.vertical.z);
-		auto rawRayDirection = make_float3(
-			camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
-			camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
-			camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
-
-		rayOrigin = camera.position;
-		rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
-
-		// Do trace
-		optixTrace(optixLaunchParameters.optixTraversableHandle,
-		           rayOrigin,
-		           rayDirectionNormalized,
-		           0.f, // TODO: this is tmax
-		           1e20f,
-		           0.0f,
-		           OptixVisibilityMask(255),
-		           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
-		           SURFACE_RAY_TYPE,
-		           RAY_TYPE_COUNT,
-		           SURFACE_RAY_TYPE,
-		           payload0,
-		           payload1);
-
-		// Loop through recorded hits
-		const unsigned int frameIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
-		float3 visibilityHitLocation = optixLaunchParameters.frame.visibleLocations[frameIndex];
-		float energy = 0;
-
-		if (visibilityHitLocation.x != nanf("")) {
-			for (unsigned int hitIndex = 0;
-			     hitIndex <= optixLaunchParameters.systemState[RayHitMetaIndex]; ++hitIndex) {
-				RayHitMeta thisHitMeta = optixLaunchParameters.rayHitMetas[hitIndex];
-				float3 rayHitLocation = thisHitMeta.hitLocation;
-				float visibilityTolerance = 1 / static_cast<float>(optixLaunchParameters.systemState[VisibilityTolerance]);
-				bool inXRange = fdimf(visibilityHitLocation.x, rayHitLocation.x) < visibilityTolerance;
-				bool inYRange = fdimf(visibilityHitLocation.y, rayHitLocation.y) < visibilityTolerance;
-				bool inZRange = fdimf(visibilityHitLocation.z, rayHitLocation.z) < visibilityTolerance;
-
-				if (inXRange && inYRange && inZRange) {
-					energy = thisHitMeta.energy;
-					break;
-				}
+			// If there's light, increment data
+			if (rayData.light) {
+				optixLaunchParameters.energyPerPixel[thisRayIndex]++;
 			}
 		}
+	}
 
-		// Edit pixelColorPerRayData and record
-		pixelColorPerRayData = {pixelColorPerRayData.r * energy, pixelColorPerRayData.g * energy,
-		                        pixelColorPerRayData.b * energy};
-		optixLaunchParameters.frame.frameColorBuffer[frameIndex] = pixelColorPerRayData;
+	// Average out brightness
+	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
+		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[thisRayIndex]) /
+		                        static_cast<float>(optixLaunchParameters.samples.total);
+		colorVector pixelColor = {intensity * baseColor.r, intensity * baseColor.g, intensity * baseColor.b};
+
+		optixLaunchParameters.frame.frameColorBuffer[thisRayIndex] = pixelColor;
 	}
 }
 
 /// Miss program
 extern "C" __global__ void __miss__radiance() {
-	if (optixLaunchParameters.systemState[MutationIndex] ==
-	    optixLaunchParameters.mutation.numberOfThem) { // Visibility check operation
-		const unsigned int ix = optixGetLaunchIndex().x;
-		const unsigned int iy = optixGetLaunchIndex().y;
-		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
-		optixLaunchParameters.frame.visibleLocations[visibleIndex] = make_float3(nanf(""), nanf(""), nanf(""));
-	} else {
-		// TODO: add to miss try counter, reset to camera if over limit
-	}
+	// Empty for now
 }
 
 /// Hit program
 extern "C" __global__ void __closesthit__radiance() {
 	const TriangleMeshSBTData &sbtData = *(const TriangleMeshSBTData *) optixGetSbtDataPointer();
-	const unsigned int ix = optixGetLaunchIndex().x;
-	const unsigned int iy = optixGetLaunchIndex().y;
 
 	// Essential hit data
 	const float3 rayDir = optixGetWorldRayDirection();
@@ -235,95 +206,24 @@ extern "C" __global__ void __closesthit__radiance() {
 	const float3 &vertexA = sbtData.vertex[index.x];
 	const float3 &vertexB = sbtData.vertex[index.y];
 	const float3 &vertexC = sbtData.vertex[index.z];
-	auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
-	auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
-	const float3 surfaceNormal = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
+	const auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
+	const auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
+	const float3 normalAxis = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
 
-	// Ray meta encode
-	RayHitMeta thisRayHitMeta = {hitLocation, rayOrigin, surfaceNormal, rayLength, 1,
-	                             optixLaunchParameters.systemState[StartFromCameraBool] == 1,
-	                             optixLaunchParameters.systemState[RayHitMetaIndex]};
+	// Second Axis
+	const float3 yAxis = normalizeVectorGPU(
+		make_float3(vertexA.x - normalAxis.x, vertexA.y - normalAxis.y, vertexA.z - normalAxis.z));
 
+	// Third Axis
+	const auto yMinusHitLoc = make_float3(yAxis.x - hitLocation.x, yAxis.y - hitLocation.y,
+	                                      yAxis.z - hitLocation.z);
+	const auto normalMinusHitLoc = make_float3(normalAxis.x - hitLocation.x, normalAxis.y - hitLocation.y,
+	                                           normalAxis.z - hitLocation.z);
+	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(yMinusHitLoc, normalMinusHitLoc));
 
-//	if (rayLength < 1) {
-//		printf("Less than 1 rayLength: %f, %lu, %lu, (%f, %f, %f)\n", rayLength,
-//		       optixLaunchParameters.systemState[MutationIndex],
-//		       optixLaunchParameters.systemState[RayHitMetaIndex], hitLocation.x, hitLocation.y, hitLocation.z);
-//	}
-
-	if (optixLaunchParameters.systemState[MutationIndex] <
-	    optixLaunchParameters.mutation.numberOfThem) { // Trace operation
-		if (sbtData.kind == Mesh) {
-			if (!optixLaunchParameters.systemState[RayHitMetaIndex] &&
-			    optixLaunchParameters.systemState[StartFromCameraBool]) { // If == 0 and start from camera
-//				printf(
-//					"Index: %lu, Camera: %lu, Mutation: %lu | Ray Origin: (%f, %f, %f) | Hit Location: (%f, %f, %f) | Hit Normal: (%f, %f, %f)\n",
-//					optixLaunchParameters.systemState[RayHitMetaIndex],
-//					optixLaunchParameters.systemState[StartFromCameraBool],
-//					optixLaunchParameters.systemState[MutationIndex], rayOrigin.x, rayOrigin.y, rayOrigin.z,
-//					hitLocation.x, hitLocation.y, hitLocation.z, surfaceNormal.x, surfaceNormal.y, surfaceNormal.z);
-
-				optixLaunchParameters.rayHitMetas[0] = thisRayHitMeta;
-			} else {
-//				if (optixLaunchParameters.systemState[RayHitMetaIndex] == 0) {
-//					printf(
-//						"Index: %lu, Camera: %lu, Mutation: %lu | Hit Location: (%f, %f, %f) | ray direction: (%f, %f, %f)\n",
-//						optixLaunchParameters.systemState[RayHitMetaIndex],
-//						optixLaunchParameters.systemState[StartFromCameraBool],
-//						optixLaunchParameters.systemState[MutationIndex], hitLocation.x, hitLocation.y,
-//						hitLocation.z, rayDir.x, rayDir.y, rayDir.z);
-//				}
-				optixLaunchParameters.systemState[RayHitMetaIndex]++;
-				optixLaunchParameters.rayHitMetas[optixLaunchParameters.systemState[RayHitMetaIndex]] = thisRayHitMeta;
-//				if (optixLaunchParameters.systemState[RayHitMetaIndex] == 1) {
-//					printf("From: (%f, %f, %f), Source Index: %lu | hit length: %f\n", thisRayHitMeta.from.x,
-//					       thisRayHitMeta.from.y,
-//					       thisRayHitMeta.from.z, thisRayHitMeta.sourceRayIndex, rayLength);
-//				}
-			}
-
-			if (optixLaunchParameters.systemState[StartFromCameraBool]) {
-				optixLaunchParameters.systemState[StartFromCameraBool] = 0;
-			}
-		} else { // Hit a light source
-//			printf("Hit Light at ray#%lu\n", optixLaunchParameters.systemState[RayHitMetaIndex]);
-			// Directly apply if root ray
-			if (optixLaunchParameters.systemState[StartFromCameraBool]) {
-				thisRayHitMeta.energy = sbtData.energy / (rayLength * rayLength); // 1 / r^2
-
-				if (!optixLaunchParameters.systemState[RayHitMetaIndex] &&
-				    optixLaunchParameters.systemState[StartFromCameraBool]) { // If == 0 and start from camera
-					optixLaunchParameters.rayHitMetas[0] = thisRayHitMeta;
-				} else {
-					optixLaunchParameters.systemState[RayHitMetaIndex]++;
-					optixLaunchParameters.rayHitMetas[optixLaunchParameters.systemState[RayHitMetaIndex]] = thisRayHitMeta;
-				}
-			} else {
-				// Reset next ray back to camera
-				optixLaunchParameters.systemState[StartFromCameraBool] = 1;
-				/// Cycle through each ray in this path
-				unsigned long metaSearchIndex = optixLaunchParameters.systemState[RayHitMetaIndex];
-				float lastEnergy = sbtData.energy; // Set energy to distribute
-				// Loop through source rays until hit root
-				while (!optixLaunchParameters.rayHitMetas[metaSearchIndex].isRootRay) {
-					// Calculate 1 / r^2 from energy
-					float searchedMetaRayLength = optixLaunchParameters.rayHitMetas[metaSearchIndex].rayLength;
-					lastEnergy /= (searchedMetaRayLength * searchedMetaRayLength);
-					// Set as energy
-					optixLaunchParameters.rayHitMetas[metaSearchIndex].energy = lastEnergy;
-					// Set next search index
-					metaSearchIndex = optixLaunchParameters.rayHitMetas[metaSearchIndex].sourceRayIndex;
-				}
-			}
-		}
-
-	} else { // Visibility check operation
-		const unsigned int visibleIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
-		optixLaunchParameters.frame.visibleLocations[visibleIndex] = hitLocation;
-
-		colorVector &perRayData = *(colorVector *) getPerRayData<colorVector>();
-		perRayData = {sbtData.color.r, sbtData.color.g, sbtData.color.b};
-	}
+	// Encode per ray data
+	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
+	perRayData = {hitLocation, normalAxis, xAxis, yAxis, sbtData.color, sbtData.kind == Light};
 }
 extern "C" __global__ void __anyhit__radiance() {}
 

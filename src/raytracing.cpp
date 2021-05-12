@@ -5,8 +5,7 @@
 // Created by microbobu on 2/15/21.
 //
 
-void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numMutations, unsigned long missLimit,
-                           unsigned int visibilityTolerance) {
+void Raytracing::initOptix(vector<TriangleMesh> &meshes) {
 	/// Initialize Optix library
 	// Reset and prep CUDA
 	cudaFree(nullptr);
@@ -28,13 +27,16 @@ void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numMutations, un
 	// Create system
 	createOptixContext();
 	createOptixModule();
+
 	// Create program groups
 	createRaygenPrograms();
 	createMissPrograms();
 	createHitgroupPrograms();
+
 	// Create Acceleration Structure
 	triangleMeshes = meshes;
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(meshes);
+
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -263,8 +265,9 @@ void Raytracing::optixRender(unsigned long numSamples, unsigned long long int se
 	createDataBuffers(numSamples);
 
 	for (unsigned long i = 0; i < numSamples; ++i) {
-		// (re)upload optix launch parameters
+		// update and (re)upload optix launch parameters
 		generateMutationNumbers((i + 1) * (seed + 1));
+		optixLaunchParameters.samples.index = i;
 		optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
 		// Launch

@@ -34,8 +34,7 @@ struct TriangleMesh {
 class Raytracing {
 public:
 	void
-	initOptix(vector<TriangleMesh> &meshes, size_t numMutations, unsigned long missLimit,
-	          unsigned int visibilityTolerance);
+	initOptix(vector<TriangleMesh> &meshes);
 
 	void setFrameSize(const uint2 &newSize);
 

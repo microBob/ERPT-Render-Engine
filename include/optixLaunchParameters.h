@@ -18,9 +18,12 @@ struct TriangleMeshSBTData {
 };
 
 struct PerRayData {
-	float3 location; // Where the trace hit
-	float3 normal; // Trace hit normal
-	bool light; // Was it a light source
+	float3 location{}; // Where the trace hit
+	float3 normal{}; // Trace hit normal
+	float3 xAxis{};
+	float3 yAxis{};
+	colorVector color;
+	bool light{}; // Was it a light source
 };
 
 struct OptixLaunchParameters {

@@ -3,7 +3,6 @@
 #include "include/raytracing.h"
 #include "include/communication.h"
 #include "include/transformations.cuh"
-#include "include/drawings.cuh"
 
 extern "C" int main() {
 	//// SECTION: Variables and instances
@@ -95,7 +94,7 @@ extern "C" int main() {
 
 	/// Init OptiX
 	try {
-		raytracing.initOptix(triangleMeshes, 2000, 50, 200);
+		raytracing.initOptix(triangleMeshes);
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);
