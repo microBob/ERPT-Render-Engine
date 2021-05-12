@@ -264,7 +264,7 @@ void Raytracing::setFrameSize(const uint2 &newSize) {
 void Raytracing::optixRender(unsigned long numSamples, unsigned long long int seed) {
 	createDataBuffers(numSamples);
 
-	for (unsigned long i = 0; i < numSamples; ++i) {
+	for (unsigned long i = 1; i <= numSamples; ++i) {
 		// update and (re)upload optix launch parameters
 		generateMutationNumbers((i + 1) * (seed + 1));
 		optixLaunchParameters.samples.index = i;
@@ -428,8 +428,8 @@ void Raytracing::createDataBuffers(unsigned long numSamples) {
 	optixLaunchParameters.energyPerPixel = static_cast<unsigned long *>(energyPerPixelBuffer.d_ptr);
 
 	// Setup mutation numbers
-	mutationNumbersBuffer.resize(frameSize * sizeof(float));
-	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
+//	mutationNumbersBuffer.resize(frameSize * sizeof(float));
+//	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
 
 	// Set total sample numbers
 	optixLaunchParameters.samples.total = numSamples;
@@ -457,7 +457,12 @@ void Raytracing::generateMutationNumbers(unsigned long long int seed) {
 	// Copy to host and upload
 	cudaMemcpy(hostNumbers, deviceNumbers, numNumbers * sizeof(float), cudaMemcpyDeviceToHost);
 	vector<float> vectorizedMutationNumbersArray{hostNumbers, hostNumbers + numNumbers};
-	mutationNumbersBuffer.upload(&vectorizedMutationNumbersArray, 1);
+	mutationNumbersBuffer.free();
+	mutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
+	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
+
+	cudaFree(deviceNumbers);
+	free(hostNumbers);
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {

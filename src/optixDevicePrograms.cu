@@ -53,8 +53,15 @@ static __forceinline__ __device__ T *getPerRayData() {
 /// Ray generation program
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
-	const unsigned int thisRayIndex =
-		optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixLaunchParameters.frame.frameBufferSize.x;
+	const unsigned int ix = optixGetLaunchIndex().x;
+	const unsigned int iy = optixGetLaunchIndex().y;
+	const unsigned int mutationNumberIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
+	const unsigned int screenX = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) *
+	                                    optixLaunchParameters.mutationNumbers[mutationNumberIndex]);
+	const unsigned int screenY = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) *
+	                                     optixLaunchParameters.mutationNumbers[mutationNumberIndex + 1]);
+	const unsigned int pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
+
 	const auto &camera = optixLaunchParameters.camera;
 
 	/// Starting ray from camera
@@ -65,9 +72,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	// Create screen ray
 	const auto screen = make_float2(
-		(static_cast<float>(thisRayIndex) + 0.5f) /
+		(static_cast<float>(screenX) + 0.5f) /
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-		(static_cast<float>(thisRayIndex + 1) + 0.5f) /
+		(static_cast<float>(screenY) + 0.5f) /
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
 	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
 	auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
@@ -105,14 +112,14 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
-			optixLaunchParameters.energyPerPixel[thisRayIndex]++;
+			optixLaunchParameters.energyPerPixel[mutationNumberIndex]++;
 		} else { // Else, continue with second ray
 			/// Second ray
 			// Create ray
-			const auto newRay = make_float3(cospif(optixLaunchParameters.mutationNumbers[thisRayIndex + 2]),
-			                                cospif(optixLaunchParameters.mutationNumbers[thisRayIndex + 3]),
-			                                fabsf(cospif(optixLaunchParameters.mutationNumbers[thisRayIndex + 4])));
-			// Transform into reflection coordinate system
+			const auto newRay = make_float3(cospif(optixLaunchParameters.mutationNumbers[mutationNumberIndex + 2]),
+			                                cospif(optixLaunchParameters.mutationNumbers[mutationNumberIndex + 3]),
+			                                fabsf(cospif(optixLaunchParameters.mutationNumbers[mutationNumberIndex + 4])));
+			// Transform into reflection coordinate system TODO: maybe i'm doing this wrong
 			const auto transformedNewRay = make_float3(
 				(-newRay.x * (rayData.normal.y * rayData.yAxis.z - rayData.normal.z * rayData.yAxis.y) +
 				 newRay.y * (rayData.normal.x * rayData.yAxis.z - rayData.normal.z * rayData.yAxis.x) -
@@ -162,18 +169,18 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 			// If there's light, increment data
 			if (rayData.light) {
-				optixLaunchParameters.energyPerPixel[thisRayIndex]++;
+				optixLaunchParameters.energyPerPixel[mutationNumberIndex]++;
 			}
 		}
 	}
 
 	// Average out brightness
 	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[thisRayIndex]) /
+		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[mutationNumberIndex]) /
 		                        static_cast<float>(optixLaunchParameters.samples.total);
 		colorVector pixelColor = {intensity * baseColor.r, intensity * baseColor.g, intensity * baseColor.b};
 
-		optixLaunchParameters.frame.frameColorBuffer[thisRayIndex] = pixelColor;
+		optixLaunchParameters.frame.frameColorBuffer[pixelIndex] = pixelColor;
 	}
 }
 
@@ -212,14 +219,10 @@ extern "C" __global__ void __closesthit__radiance() {
 
 	// Second Axis
 	const float3 yAxis = normalizeVectorGPU(
-		make_float3(vertexA.x - normalAxis.x, vertexA.y - normalAxis.y, vertexA.z - normalAxis.z));
+		make_float3(vertexA.x - hitLocation.x, vertexA.y - hitLocation.y, vertexA.z - hitLocation.z));
 
 	// Third Axis
-	const auto yMinusHitLoc = make_float3(yAxis.x - hitLocation.x, yAxis.y - hitLocation.y,
-	                                      yAxis.z - hitLocation.z);
-	const auto normalMinusHitLoc = make_float3(normalAxis.x - hitLocation.x, normalAxis.y - hitLocation.y,
-	                                           normalAxis.z - hitLocation.z);
-	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(yMinusHitLoc, normalMinusHitLoc));
+	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(yAxis, normalAxis));
 
 	// Encode per ray data
 	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
