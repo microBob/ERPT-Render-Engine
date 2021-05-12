@@ -17,38 +17,32 @@ struct TriangleMeshSBTData {
 	MeshKind kind{};
 };
 
-struct RayHitMeta {
-	float3 hitLocation;
-	float3 from; // Where did this hit originate from
-	float3 hitNormal;
-	float rayLength;
-	unsigned long visits; // For detailed balance
-	bool isRootRay;
-	unsigned long sourceRayIndex; // Subsequent rays from this point
-	float energy; // Brightness
+struct PerRayData {
+	float3 location; // Where the trace hit
+	float3 normal; // Trace hit normal
+	bool light; // Was it a light source
 };
 
 struct OptixLaunchParameters {
 	struct {
 		colorVector *frameColorBuffer{};
 		uint2 frameBufferSize{};
-		float3 *visibleLocations{};
 	} frame;
 
 	struct {
 		float3 position, direction, horizontal, vertical;
 	} camera{};
 
+	struct {
+		unsigned long index;
+		unsigned long total;
+	} samples{};
+
 	OptixTraversableHandle optixTraversableHandle{};
 
-	struct {
-		size_t numberOfThem{};
-		float3 *numbers{};
-	} mutation;
+	float *mutationNumbers{};
 
-	RayHitMeta *rayHitMetas{};
-
-	unsigned long *systemState{}; // Mutation index, RayHitMeta index, Start from screen bool
+	unsigned long *energyPerPixel{}; // Energy level per pixel
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H

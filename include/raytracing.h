@@ -34,11 +34,12 @@ struct TriangleMesh {
 class Raytracing {
 public:
 	void
-	initOptix(vector<TriangleMesh> &meshes, size_t numMutations, unsigned long missLimit, unsigned int visibilityTolerance);
+	initOptix(vector<TriangleMesh> &meshes, size_t numMutations, unsigned long missLimit,
+	          unsigned int visibilityTolerance);
 
 	void setFrameSize(const uint2 &newSize);
 
-	void optixRender();
+	void optixRender(unsigned long numSamples, unsigned long long int seed);
 
 	void downloadRender(float *pixData);
 
@@ -65,9 +66,9 @@ protected:
 	// Acceleration structure
 	OptixTraversableHandle buildAccelerationStructure(vector<TriangleMesh> &meshes);
 
-	// Rendering mutation (random) number
-	void generateMutationNumbers(size_t numMutations, unsigned long long int seed, unsigned long missLimit,
-	                             unsigned int visibilityTolerance);
+	// OptiX parameters
+	void createDataBuffers(unsigned long numSamples);
+	void generateMutationNumbers(unsigned long long int seed);
 
 private:
 	static float3 normalizedVector(float3 vector);
@@ -105,7 +106,6 @@ protected: // Launch and rendering
 	OptixLaunchParameters optixLaunchParameters;
 	CUDABuffer optixLaunchParametersBuffer;
 	CUDABuffer frameColorBuffer;
-	CUDABuffer visibleLocationsBuffer;
 
 protected:
 	Camera lastSetCamera; // Camera used for rendering
@@ -114,15 +114,11 @@ protected:
 
 	vector<CUDABuffer> indexBuffer;
 
-	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
-	size_t numberOfMutations;
-
 	CUDABuffer mutationNumbersBuffer;
 
-	CUDABuffer rayHitMetasBuffer;
+	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
 
-	CUDABuffer systemStateBuffer;
-
+	CUDABuffer energyPerPixelBuffer;
 };
 
 //// SECTION: Shader binding table structs

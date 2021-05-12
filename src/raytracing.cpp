@@ -35,9 +35,6 @@ void Raytracing::initOptix(vector<TriangleMesh> &meshes, size_t numMutations, un
 	// Create Acceleration Structure
 	triangleMeshes = meshes;
 	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(meshes);
-	// Generate mutation numbers
-	numberOfMutations = numMutations;
-	generateMutationNumbers(numMutations, 0, missLimit, visibilityTolerance);
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -256,23 +253,25 @@ void Raytracing::createShaderBindingTable() {
 void Raytracing::setFrameSize(const uint2 &newSize) {
 	// Update cuda frame buffer
 	frameColorBuffer.resize(newSize.x * newSize.y * sizeof(colorVector));
-	visibleLocationsBuffer.resize(newSize.x * newSize.y * sizeof(float3));
 
 	// Update launch parameters
 	optixLaunchParameters.frame.frameBufferSize = newSize;
 	optixLaunchParameters.frame.frameColorBuffer = static_cast<colorVector *>(frameColorBuffer.d_ptr);
-	optixLaunchParameters.frame.visibleLocations = static_cast<float3 *>(visibleLocationsBuffer.d_ptr);
 }
 
-void Raytracing::optixRender() {
-	optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
+void Raytracing::optixRender(unsigned long numSamples, unsigned long long int seed) {
+	createDataBuffers(numSamples);
 
-	// Single Ray MLT
-	for (int i = 0; i < numberOfMutations; ++i) {
+	for (unsigned long i = 0; i < numSamples; ++i) {
+		// (re)upload optix launch parameters
+		generateMutationNumbers((i + 1) * (seed + 1));
+		optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
+
+		// Launch
 		auto launchingOptixRender = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
 		                                        optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-		                                        1,
-		                                        1,
+		                                        optixLaunchParameters.frame.frameBufferSize.x,
+		                                        optixLaunchParameters.frame.frameBufferSize.y,
 		                                        1);
 		assert(launchingOptixRender == OPTIX_SUCCESS);
 
@@ -282,20 +281,6 @@ void Raytracing::optixRender() {
 			fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
 			exit(2);
 		}
-	}
-	// Determine visible locations
-	auto launchingOptixVisibilityCheck = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
-	                                                 optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-	                                                 optixLaunchParameters.frame.frameBufferSize.x,
-	                                                 optixLaunchParameters.frame.frameBufferSize.y,
-	                                                 1);
-	assert(launchingOptixVisibilityCheck == OPTIX_SUCCESS);
-
-	cudaDeviceSynchronize();
-	cudaError_t error = cudaGetLastError();
-	if (error != cudaSuccess) {
-		fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
-		exit(2);
 	}
 }
 
@@ -431,16 +416,32 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure(vector<TriangleMes
 	return accelerationStructureHandle;
 }
 
-void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long int seed, unsigned long missLimit,
-                                         unsigned int visibilityTolerance) {
+void Raytracing::createDataBuffers(unsigned long numSamples) {
+	unsigned int frameSize =
+		optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y;
+
+	// Set energy per pixel
+	energyPerPixelBuffer.resize(frameSize * sizeof(unsigned long));
+	optixLaunchParameters.energyPerPixel = static_cast<unsigned long *>(energyPerPixelBuffer.d_ptr);
+
+	// Setup mutation numbers
+	mutationNumbersBuffer.resize(frameSize * sizeof(float));
+	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
+
+	// Set total sample numbers
+	optixLaunchParameters.samples.total = numSamples;
+}
+
+void Raytracing::generateMutationNumbers(unsigned long long int seed) {
 	// Setup
 	curandGenerator_t gen;
 	float *deviceNumbers, *hostNumbers;
-	size_t arraySize = numMutations * 3 * sizeof(float); // x3 for x, y, z
+	size_t numNumbers = optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y *
+	                    (2 + 3); // screen size * (starting loc + 3 * bounces)
 
 	// Allocate memory for data
-	hostNumbers = static_cast<float *>(calloc(numMutations * 3, sizeof(float)));
-	cudaMalloc(reinterpret_cast<void **>(&deviceNumbers), arraySize);
+	hostNumbers = static_cast<float *>(calloc(numNumbers, sizeof(float)));
+	cudaMalloc(reinterpret_cast<void **>(&deviceNumbers), numNumbers * sizeof(float));
 
 	// cuRAND setup
 	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
@@ -448,30 +449,12 @@ void Raytracing::generateMutationNumbers(size_t numMutations, unsigned long long
 	curandSetGeneratorOrdering(gen, CURAND_ORDERING_PSEUDO_SEEDED);
 
 	// Generate
-	curandGenerateUniform(gen, deviceNumbers, numMutations);
+	curandGenerateUniform(gen, deviceNumbers, numNumbers);
 
-	// Copy back to host and convert to float3 vector
-	cudaMemcpy(hostNumbers, deviceNumbers, arraySize, cudaMemcpyDeviceToHost);
-	vector<float3> vectorizedMutationNumbersArray;
-	for (int i = 0; i < numMutations; ++i) {
-		auto entry = make_float3(hostNumbers[i], hostNumbers[i + 1], hostNumbers[i + 2]);
-		vectorizedMutationNumbersArray.push_back(entry);
-	}
-
-	// Re-upload as buffer; TODO: improve this to not use re-upload
-	mutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
-	optixLaunchParameters.mutation.numbers = static_cast<float3 *>(mutationNumbersBuffer.d_ptr);
-	optixLaunchParameters.mutation.numberOfThem = numMutations;
-
-	// Also create ray hit meta buffer
-	rayHitMetasBuffer.resize(numMutations * sizeof(RayHitMeta));
-	optixLaunchParameters.rayHitMetas = static_cast<RayHitMeta *>(rayHitMetasBuffer.d_ptr);
-
-	// Also create system state
-	vector<unsigned long> systemStateVector{0, 0, 1, 0, missLimit,
-	                                        visibilityTolerance}; // mutation index, rayHitMeta index, start from screen
-	systemStateBuffer.alloc_and_upload(systemStateVector);
-	optixLaunchParameters.systemState = static_cast<unsigned long *>(systemStateBuffer.d_ptr);
+	// Copy to host and upload
+	cudaMemcpy(hostNumbers, deviceNumbers, numNumbers * sizeof(float), cudaMemcpyDeviceToHost);
+	vector<float> vectorizedMutationNumbersArray{hostNumbers, hostNumbers + numNumbers};
+	mutationNumbersBuffer.upload(&vectorizedMutationNumbersArray, 1);
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {
