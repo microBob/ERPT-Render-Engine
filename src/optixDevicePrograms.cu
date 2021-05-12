@@ -112,7 +112,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
-			optixLaunchParameters.energyPerPixel[mutationNumberIndex]++;
+			optixLaunchParameters.energyPerPixel[pixelIndex]++;
 		} else { // Else, continue with second ray
 			/// Second ray
 			// Create ray
@@ -169,14 +169,14 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 			// If there's light, increment data
 			if (rayData.light) {
-				optixLaunchParameters.energyPerPixel[mutationNumberIndex]++;
+				optixLaunchParameters.energyPerPixel[pixelIndex]++;
 			}
 		}
 	}
 
 	// Average out brightness
 	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[mutationNumberIndex]) /
+		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[pixelIndex]) /
 		                        static_cast<float>(optixLaunchParameters.samples.total);
 		colorVector pixelColor = {intensity * baseColor.r, intensity * baseColor.g, intensity * baseColor.b};
 
