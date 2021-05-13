@@ -16,7 +16,7 @@ enum {
 
 /// Utility functions
 __device__ float3 normalizeVectorGPU(float3 vector) {
-	auto r_normal = rnorm3df(vector.x, vector.y, vector.z);
+	const auto r_normal = rnorm3df(vector.x, vector.y, vector.z);
 
 	return make_float3(vector.x * r_normal, vector.y * r_normal, vector.z * r_normal);
 }
@@ -57,10 +57,10 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const unsigned int iy = optixGetLaunchIndex().y;
 	const unsigned int mutationNumberIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 	const unsigned int screenX = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) *
-	                                    optixLaunchParameters.mutationNumbers[mutationNumberIndex]);
+	                                     optixLaunchParameters.mutationNumbers[mutationNumberIndex]);
 	const unsigned int screenY = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) *
 	                                     optixLaunchParameters.mutationNumbers[mutationNumberIndex + 1]);
-	const unsigned int pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
+	const unsigned int pixelIndex = mutationNumberIndex; //screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
 
 	const auto &camera = optixLaunchParameters.camera;
 
@@ -72,9 +72,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	// Create screen ray
 	const auto screen = make_float2(
-		(static_cast<float>(screenX) + 0.5f) /
+		(static_cast<float>(ix) + 0.5f) /
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-		(static_cast<float>(screenY) + 0.5f) /
+		(static_cast<float>(iy) + 0.5f) /
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
 	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
 	auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
@@ -118,39 +118,21 @@ extern "C" __global__ void __raygen__renderFrame() {
 			// Create ray
 			const auto newRay = make_float3(cospif(optixLaunchParameters.mutationNumbers[mutationNumberIndex + 2]),
 			                                cospif(optixLaunchParameters.mutationNumbers[mutationNumberIndex + 3]),
-			                                fabsf(cospif(optixLaunchParameters.mutationNumbers[mutationNumberIndex + 4])));
-			// Transform into reflection coordinate system TODO: maybe i'm doing this wrong
-			const auto transformedNewRay = make_float3(
-				(-newRay.x * (rayData.normal.y * rayData.yAxis.z - rayData.normal.z * rayData.yAxis.y) +
-				 newRay.y * (rayData.normal.x * rayData.yAxis.z - rayData.normal.z * rayData.yAxis.x) -
-				 newRay.z * (rayData.normal.x * rayData.yAxis.y - rayData.normal.y * rayData.yAxis.x)) /
-				(rayData.normal.x * rayData.xAxis.y * rayData.yAxis.z -
-				 rayData.normal.x * rayData.xAxis.z * rayData.yAxis.y -
-				 rayData.normal.y * rayData.xAxis.x * rayData.yAxis.z +
-				 rayData.normal.y * rayData.xAxis.z * rayData.yAxis.x +
-				 rayData.normal.z * rayData.xAxis.x * rayData.yAxis.y -
-				 rayData.normal.z * rayData.xAxis.y * rayData.yAxis.x),
-				(newRay.x * (rayData.normal.y * rayData.xAxis.z - rayData.normal.z * rayData.xAxis.y) -
-				 newRay.y * (rayData.normal.x * rayData.xAxis.z - rayData.normal.z * rayData.xAxis.x) +
-				 newRay.z * (rayData.normal.x * rayData.xAxis.y - rayData.normal.y * rayData.xAxis.x)) /
-				(rayData.normal.x * rayData.xAxis.y * rayData.yAxis.z -
-				 rayData.normal.x * rayData.xAxis.z * rayData.yAxis.y -
-				 rayData.normal.y * rayData.xAxis.x * rayData.yAxis.z +
-				 rayData.normal.y * rayData.xAxis.z * rayData.yAxis.x +
-				 rayData.normal.z * rayData.xAxis.x * rayData.yAxis.y -
-				 rayData.normal.z * rayData.xAxis.y * rayData.yAxis.x),
-				(newRay.x * (rayData.xAxis.y * rayData.yAxis.z - rayData.xAxis.z * rayData.yAxis.y) -
-				 newRay.y * (rayData.xAxis.x * rayData.yAxis.z - rayData.xAxis.z * rayData.yAxis.x) +
-				 newRay.z * (rayData.xAxis.x * rayData.yAxis.y - rayData.xAxis.y * rayData.yAxis.x)) /
-				(rayData.normal.x * rayData.xAxis.y * rayData.yAxis.z -
-				 rayData.normal.x * rayData.xAxis.z * rayData.yAxis.y -
-				 rayData.normal.y * rayData.xAxis.x * rayData.yAxis.z +
-				 rayData.normal.y * rayData.xAxis.z * rayData.yAxis.x +
-				 rayData.normal.z * rayData.xAxis.x * rayData.yAxis.y -
-				 rayData.normal.z * rayData.xAxis.y * rayData.yAxis.x));
+			                                fabsf(cospif(
+				                                optixLaunchParameters.mutationNumbers[mutationNumberIndex + 4])));
+			const float r = sqrt(optixLaunchParameters.mutationNumbers[mutationNumberIndex + 2]);
+			const float phi = 2 * 3.1415f * optixLaunchParameters.mutationNumbers[mutationNumberIndex + 3];
+			const float circleX = r * cos(phi);
+			const float circleY = r * sin(phi);
+			const float circleZ = sqrt(1 - (r * r));
+			const float3 newDirection = make_float3(
+				rayData.xAxis.x * circleX + rayData.yAxis.x * circleY + rayData.normal.x * circleZ,
+				rayData.xAxis.y * circleX + rayData.yAxis.y * circleY + rayData.normal.y * circleZ,
+				rayData.xAxis.z * circleX + rayData.yAxis.z * circleY + rayData.normal.z * circleZ);
 
 			rayOrigin = rayData.location;
-			rayDirectionNormalized = normalizeVectorGPU(transformedNewRay);
+			rayDirectionNormalized = newDirection;//normalizeVectorGPU(newDirection);
+
 
 			// Trace
 			optixTrace(optixLaunchParameters.optixTraversableHandle,
@@ -216,13 +198,14 @@ extern "C" __global__ void __closesthit__radiance() {
 	const auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
 	const auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
 	const float3 normalAxis = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
+	float normalDotDir = normalAxis.x * rayDir.x + normalAxis.y * rayDir.y + normalAxis.z * rayDir.z;
 
 	// Second Axis
 	const float3 yAxis = normalizeVectorGPU(
-		make_float3(vertexA.x - hitLocation.x, vertexA.y - hitLocation.y, vertexA.z - hitLocation.z));
+		vectorCrossProductGPU(make_float3(-1, 2, 3), normalAxis));
 
 	// Third Axis
-	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(yAxis, normalAxis));
+	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));
 
 	// Encode per ray data
 	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
