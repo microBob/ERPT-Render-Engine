@@ -40,10 +40,10 @@ Drawings::extractConnectedVerticesCPU(const rapidjson::GenericValue<rapidjson::U
 	vector<vector<unsigned int >> connectedVertices;
 	unsigned int vertexOffset = 0;
 
-	for (int i = 0; i < meshDataDOM.Size(); ++i) { // Loop through every triangleMesh in scene
+	for (int i = 0; i < meshDataDOM.Size(); ++i) { // Loop through every triangleMeshes in scene
 		auto curMesh = meshDataDOM[i].GetObject();
 
-		// Loop through every face in triangleMesh
+		// Loop through every face in triangleMeshes
 		for (auto &curMeshFaces : curMesh.FindMember(FACES)->value.GetArray()) {
 			auto curMeshFaceVertices = curMeshFaces.GetObject().FindMember(VERTICES)->value.GetArray();
 			for (int l = 0; l < curMeshFaceVertices.Size(); ++l) { // Loop through every vertex on face
@@ -58,7 +58,7 @@ Drawings::extractConnectedVerticesCPU(const rapidjson::GenericValue<rapidjson::U
 			}
 		}
 
-		// Increment vertex index offset with this completed triangleMesh
+		// Increment vertex index offset with this completed triangleMeshes
 		vertexOffset += curMesh.FindMember(VERTICES)->value.GetArray().Size();
 	}
 	return connectedVertices;

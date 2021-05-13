@@ -27,16 +27,18 @@ struct TriangleMesh {
 	vector<float3> vertices;
 	vector<uint3> indices;
 	colorVector color;
+	MeshKind meshKind;
 };
 
 //// SECTION: Class definition
 class Raytracing {
 public:
-	void initOptix(TriangleMesh &newMesh);
+	void
+	initOptix(vector<TriangleMesh> &meshes);
 
 	void setFrameSize(const uint2 &newSize);
 
-	void optixRender();
+	void optixRender(unsigned long numSamples, unsigned long long int seed);
 
 	void downloadRender(float *pixData);
 
@@ -61,10 +63,11 @@ protected:
 	void createShaderBindingTable();
 
 	// Acceleration structure
-	OptixTraversableHandle buildAccelerationStructure(TriangleMesh &triMesh);
+	OptixTraversableHandle buildAccelerationStructure(vector<TriangleMesh> &meshes);
 
-	// Rendering mutation (random) number
-	void generateMutationNumbers(size_t nFloats);
+	// OptiX parameters
+	void createDataBuffers(unsigned long numSamples);
+	void generateMutationNumbers(unsigned long long int seed);
 
 private:
 	static float3 normalizedVector(float3 vector);
@@ -105,15 +108,16 @@ protected: // Launch and rendering
 
 protected:
 	Camera lastSetCamera; // Camera used for rendering
+	vector<TriangleMesh> triangleMeshes; // Mesh definition
+	vector<CUDABuffer> vertexBuffer;
 
-	TriangleMesh triangleMesh; // Mesh definition
-	CUDABuffer vertexBuffer;
-	CUDABuffer indexBuffer;
-
-	CUDABuffer accelerationStructureBuffer; // Compressed triangleMesh definition
+	vector<CUDABuffer> indexBuffer;
 
 	CUDABuffer mutationNumbersBuffer;
 
+	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
+
+	CUDABuffer energyPerPixelBuffer;
 };
 
 //// SECTION: Shader binding table structs

@@ -3,7 +3,6 @@
 #include "include/raytracing.h"
 #include "include/communication.h"
 #include "include/transformations.cuh"
-#include "include/drawings.cuh"
 
 extern "C" int main() {
 	//// SECTION: Variables and instances
@@ -50,23 +49,33 @@ extern "C" int main() {
 	raytracing.setFrameSize(frameBufferSize);
 
 	/// Translate scene data
-	TriangleMesh triangleMesh;
-	// Mesh Vertices
-	auto meshDataDOM = sceneDataDOM.FindMember(MESHES)->value.GetObject();
-	for (auto &curVertex : meshDataDOM.FindMember(VERTICES)->value.GetArray()) {
-		auto vertexArray = curVertex.GetArray();
-		triangleMesh.vertices.push_back(
-			make_float3(vertexArray[0].GetFloat(), vertexArray[1].GetFloat(),
-			            vertexArray[2].GetFloat()));
+	vector<TriangleMesh> triangleMeshes;
+	// For each Mesh
+	for (auto &curMesh : sceneDataDOM.FindMember(MESHES)->value.GetArray()) {
+		TriangleMesh curMeshEncode;
+		// Vertices
+		for (auto &curVertex : curMesh.FindMember(VERTICES)->value.GetArray()) {
+			auto vertexArray = curVertex.GetArray();
+			curMeshEncode.vertices.push_back(
+				make_float3(vertexArray[0].GetFloat(), vertexArray[1].GetFloat(),
+				            vertexArray[2].GetFloat()));
+		}
+		// Face Indices
+		for (auto &curFace : curMesh.FindMember(INDICES)->value.GetArray()) {
+			auto indexArray = curFace.GetArray();
+			curMeshEncode.indices.push_back(
+				make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
+		}
+		// Kind
+		curMeshEncode.meshKind = static_cast<MeshKind>(curMesh.FindMember(KIND)->value.GetInt());
+		// Color
+		if (curMeshEncode.meshKind == Mesh) {
+			curMeshEncode.color = {0.2f, 0.8f, 0.2f};
+		}
+
+		// Add to triangleMeshes
+		triangleMeshes.push_back(curMeshEncode);
 	}
-	// Face Indices
-	for (auto &curFace : meshDataDOM.FindMember(INDICES)->value.GetArray()) {
-		auto indexArray = curFace.GetArray();
-		triangleMesh.indices.push_back(
-			make_uint3(indexArray[0].GetUint(), indexArray[1].GetUint(), indexArray[2].GetUint()));
-	}
-	// Material
-	triangleMesh.color = {0.2f, 0.8f, 0.2f};
 
 	/// Camera
 	auto cameraDataDOM = sceneDataDOM.FindMember(CAMERA)->value.GetObject();
@@ -85,14 +94,14 @@ extern "C" int main() {
 
 	/// Init OptiX
 	try {
-		raytracing.initOptix(triangleMesh);
+		raytracing.initOptix(triangleMeshes);
 	} catch (runtime_error &error) {
 		cout << error.what() << endl;
 		exit(1);
 	}
 
 	//// SECTION: OptiX render
-	raytracing.optixRender();
+	raytracing.optixRender(1000, 0);
 	raytracing.downloadRender(pixData);
 
 

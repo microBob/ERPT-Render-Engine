@@ -5,7 +5,7 @@
 // Created by microbobu on 2/15/21.
 //
 
-void Raytracing::initOptix(TriangleMesh &newMesh) {
+void Raytracing::initOptix(vector<TriangleMesh> &meshes) {
 	/// Initialize Optix library
 	// Reset and prep CUDA
 	cudaFree(nullptr);
@@ -27,15 +27,16 @@ void Raytracing::initOptix(TriangleMesh &newMesh) {
 	// Create system
 	createOptixContext();
 	createOptixModule();
+
 	// Create program groups
 	createRaygenPrograms();
 	createMissPrograms();
 	createHitgroupPrograms();
+
 	// Create Acceleration Structure
-	triangleMesh = newMesh;
-	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(newMesh);
-	// Generate mutation numbers
-	generateMutationNumbers(100);
+	triangleMeshes = meshes;
+	optixLaunchParameters.optixTraversableHandle = buildAccelerationStructure(meshes);
+
 	// Create Pipeline and SBT
 	createOptiXPipeline();
 	createShaderBindingTable();
@@ -234,16 +235,15 @@ void Raytracing::createShaderBindingTable() {
 	shaderBindingTable.missRecordCount = static_cast<int>(missRecords.size());
 
 	// Hitgroup records
-	int numberOfObjects = 1; // TODO: make this reflect actual number of objects
 	vector<HitgroupRecord> hitgroupRecords;
-	for (int i = 0; i < numberOfObjects; ++i) {
-		int objectType = 0;
+	for (int i = 0; i < triangleMeshes.size(); ++i) {
 		HitgroupRecord record;
-		auto optixSBTRecordPackHeader = optixSbtRecordPackHeader(hitgroupProgramGroups[objectType], &record);
+		auto optixSBTRecordPackHeader = optixSbtRecordPackHeader(hitgroupProgramGroups[0], &record);
 		assert(optixSBTRecordPackHeader == OPTIX_SUCCESS);
-		record.data.vertex = (float3 *) vertexBuffer.d_pointer();
-		record.data.index = (int3 *) indexBuffer.d_pointer();
-		record.data.color = triangleMesh.color;
+		record.data.vertex = (float3 *) vertexBuffer[i].d_pointer();
+		record.data.index = (int3 *) indexBuffer[i].d_pointer();
+		record.data.color = triangleMeshes[i].color;
+		record.data.kind = triangleMeshes[i].meshKind;
 		hitgroupRecords.push_back(record);
 	}
 	hitgroupRecordsBuffer.alloc_and_upload(hitgroupRecords);
@@ -261,21 +261,29 @@ void Raytracing::setFrameSize(const uint2 &newSize) {
 	optixLaunchParameters.frame.frameColorBuffer = static_cast<colorVector *>(frameColorBuffer.d_ptr);
 }
 
-void Raytracing::optixRender() {
-	optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
+void Raytracing::optixRender(unsigned long numSamples, unsigned long long int seed) {
+	createDataBuffers(numSamples);
 
-	auto launchingOptix = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
-	                                  optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
-	                                  optixLaunchParameters.frame.frameBufferSize.x,
-	                                  optixLaunchParameters.frame.frameBufferSize.y,
-	                                  1);
-	assert(launchingOptix == OPTIX_SUCCESS);
+	for (unsigned long i = 1; i <= numSamples; ++i) {
+		// update and (re)upload optix launch parameters
+		generateMutationNumbers((i + 1) * (seed + 1));
+		optixLaunchParameters.samples.index = i;
+		optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
-	cudaDeviceSynchronize();
-	cudaError_t error = cudaGetLastError();
-	if (error != cudaSuccess) {
-		fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
-		exit(2);
+		// Launch
+		auto launchingOptixRender = optixLaunch(optixPipeline, cudaStream, optixLaunchParametersBuffer.d_pointer(),
+		                                        optixLaunchParametersBuffer.sizeInBytes, &shaderBindingTable,
+		                                        optixLaunchParameters.frame.frameBufferSize.x,
+		                                        optixLaunchParameters.frame.frameBufferSize.y,
+		                                        1);
+		assert(launchingOptixRender == OPTIX_SUCCESS);
+
+		cudaDeviceSynchronize();
+		cudaError_t error = cudaGetLastError();
+		if (error != cudaSuccess) {
+			fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
+			exit(2);
+		}
 	}
 }
 
@@ -315,39 +323,48 @@ void Raytracing::setCamera(const Camera &camera) {
 	                                                    camera.cosFovY * normalizedVerticalCross.z);
 }
 
-OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triMesh) {
-	// Upload model to GPU
-	vertexBuffer.alloc_and_upload(triMesh.vertices);
-	indexBuffer.alloc_and_upload(triMesh.indices);
+OptixTraversableHandle Raytracing::buildAccelerationStructure(vector<TriangleMesh> &meshes) {
+	/// Resize buffers
+	vertexBuffer.resize(meshes.size());
+	indexBuffer.resize(meshes.size());
 
+	/// Create Handler and holders
 	OptixTraversableHandle accelerationStructureHandle{0};
+	vector<OptixBuildInput> triangleInput(meshes.size());
+	vector<CUdeviceptr> deviceVertices(meshes.size());
+	vector<CUdeviceptr> deviceIndices(meshes.size());
+	vector<uint32_t> triangleInputFlags(meshes.size());
 
-	/// Triangle Inputs
-	OptixBuildInput triangleInput = {};
-	triangleInput.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+	for (int meshID = 0; meshID < meshes.size(); ++meshID) {
+		/// Mesh data
+		TriangleMesh &curMesh = meshes[meshID];
+		vertexBuffer[meshID].alloc_and_upload(curMesh.vertices);
+		deviceVertices[meshID] = vertexBuffer[meshID].d_pointer();
+		indexBuffer[meshID].alloc_and_upload(curMesh.indices);
+		deviceIndices[meshID] = indexBuffer[meshID].d_pointer();
+		// Setup Input
+		triangleInput[meshID] = {};
+		triangleInput[meshID].type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+		triangleInputFlags[meshID] = 0;
+		// Vertices
+		triangleInput[meshID].triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
+		triangleInput[meshID].triangleArray.vertexStrideInBytes = sizeof(float3);
+		triangleInput[meshID].triangleArray.numVertices = static_cast<int>(curMesh.vertices.size());
+		triangleInput[meshID].triangleArray.vertexBuffers = &deviceVertices[meshID];
+		// Indices
+		triangleInput[meshID].triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+		triangleInput[meshID].triangleArray.indexStrideInBytes = sizeof(uint3);
+		triangleInput[meshID].triangleArray.numIndexTriplets = static_cast<int>(curMesh.indices.size());
+		triangleInput[meshID].triangleArray.indexBuffer = deviceIndices[meshID];
 
-	// Local pointers to data
-	CUdeviceptr deviceVertices = vertexBuffer.d_pointer();
-	CUdeviceptr deviceIndices = indexBuffer.d_pointer();
+		/// SBT records
+		triangleInput[meshID].triangleArray.flags = &triangleInputFlags[meshID];
+		triangleInput[meshID].triangleArray.numSbtRecords = 1;
+		triangleInput[meshID].triangleArray.sbtIndexOffsetBuffer = 0;
+		triangleInput[meshID].triangleArray.sbtIndexOffsetSizeInBytes = 0;
+		triangleInput[meshID].triangleArray.sbtIndexOffsetStrideInBytes = 0;
+	}
 
-	triangleInput.triangleArray.vertexFormat = OPTIX_VERTEX_FORMAT_FLOAT3;
-	triangleInput.triangleArray.vertexStrideInBytes = sizeof(float3);
-	triangleInput.triangleArray.numVertices = static_cast<int>(triMesh.vertices.size());
-	triangleInput.triangleArray.vertexBuffers = &deviceVertices;
-
-	triangleInput.triangleArray.indexFormat = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-	triangleInput.triangleArray.indexStrideInBytes = sizeof(uint3);
-	triangleInput.triangleArray.numIndexTriplets = static_cast<int>(triMesh.indices.size());
-	triangleInput.triangleArray.indexBuffer = deviceIndices;
-
-	uint32_t triangleInputFlags[1] = {0};
-
-	// SBT records
-	triangleInput.triangleArray.flags = triangleInputFlags;
-	triangleInput.triangleArray.numSbtRecords = 1;
-	triangleInput.triangleArray.sbtIndexOffsetBuffer = 0;
-	triangleInput.triangleArray.sbtIndexOffsetSizeInBytes = 0;
-	triangleInput.triangleArray.sbtIndexOffsetStrideInBytes = 0;
 
 	/// BLAS setup
 	OptixAccelBuildOptions accelBuildOptions = {};
@@ -356,8 +373,9 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triM
 	accelBuildOptions.operation = OPTIX_BUILD_OPERATION_BUILD;
 
 	OptixAccelBufferSizes blasBufferSizes;
-	auto accelComputerMemoryUsage = optixAccelComputeMemoryUsage(optixDeviceContext, &accelBuildOptions, &triangleInput,
-	                                                             1, &blasBufferSizes);
+	auto accelComputerMemoryUsage = optixAccelComputeMemoryUsage(optixDeviceContext, &accelBuildOptions,
+	                                                             triangleInput.data(),
+	                                                             static_cast<int>(meshes.size()), &blasBufferSizes);
 	assert(accelComputerMemoryUsage == OPTIX_SUCCESS);
 
 	/// Prep compaction
@@ -375,7 +393,8 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triM
 	CUDABuffer outputBuffer;
 	outputBuffer.alloc(blasBufferSizes.outputSizeInBytes);
 
-	auto accelBuild = optixAccelBuild(optixDeviceContext, nullptr, &accelBuildOptions, &triangleInput, 1,
+	auto accelBuild = optixAccelBuild(optixDeviceContext, nullptr, &accelBuildOptions, triangleInput.data(),
+	                                  static_cast<int>(meshes.size()),
 	                                  tempBuffer.d_pointer(), tempBuffer.sizeInBytes, outputBuffer.d_pointer(),
 	                                  outputBuffer.sizeInBytes, &accelerationStructureHandle, &emitDesc, 1);
 	cudaDeviceSynchronize();
@@ -400,35 +419,54 @@ OptixTraversableHandle Raytracing::buildAccelerationStructure(TriangleMesh &triM
 	return accelerationStructureHandle;
 }
 
-void Raytracing::generateMutationNumbers(size_t nFloats) {
+void Raytracing::createDataBuffers(unsigned long numSamples) {
+	unsigned int frameSize =
+		optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y;
+
+	// Set energy per pixel
+	energyPerPixelBuffer.resize(frameSize * sizeof(unsigned long));
+	optixLaunchParameters.energyPerPixel = static_cast<unsigned long *>(energyPerPixelBuffer.d_ptr);
+
+	// Setup mutation numbers
+//	mutationNumbersBuffer.resize(frameSize * sizeof(float));
+//	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
+
+	// Set total sample numbers
+	optixLaunchParameters.samples.total = numSamples;
+}
+
+void Raytracing::generateMutationNumbers(unsigned long long int seed) {
 	// Setup
 	curandGenerator_t gen;
 	float *deviceNumbers, *hostNumbers;
-	size_t arraySize = nFloats * sizeof(float);
+	size_t numNumbers = optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y *
+	                    (2 + 3); // screen size * (starting loc + 3 * bounces)
 
 	// Allocate memory for data
-	hostNumbers = static_cast<float *>(calloc(nFloats, sizeof(float)));
-	cudaMalloc(reinterpret_cast<void **>(&deviceNumbers), arraySize);
+	hostNumbers = static_cast<float *>(calloc(numNumbers, sizeof(float)));
+	cudaMalloc(reinterpret_cast<void **>(&deviceNumbers), numNumbers * sizeof(float));
 
 	// cuRAND setup
 	curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-	curandSetPseudoRandomGeneratorSeed(gen, 0);
+	curandSetPseudoRandomGeneratorSeed(gen, seed);
 	curandSetGeneratorOrdering(gen, CURAND_ORDERING_PSEUDO_SEEDED);
 
 	// Generate
-	curandGenerateUniform(gen, deviceNumbers, nFloats);
+	curandGenerateUniform(gen, deviceNumbers, numNumbers);
 
-	// Copy back to host
-	cudaMemcpy(hostNumbers, deviceNumbers, arraySize, cudaMemcpyDeviceToHost);
+	// Copy to host and upload
+	cudaMemcpy(hostNumbers, deviceNumbers, numNumbers * sizeof(float), cudaMemcpyDeviceToHost);
+	vector<float> vectorizedMutationNumbersArray{hostNumbers, hostNumbers + numNumbers};
+	mutationNumbersBuffer.free();
+	mutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
+	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
 
-	// Re-upload as buffer; TODO: improve this to not use re-upload
-	vector<float> vectorizedArray(hostNumbers, hostNumbers + nFloats);
-	mutationNumbersBuffer.alloc_and_upload(vectorizedArray);
-	optixLaunchParameters.mutationNumbers = (float *) mutationNumbersBuffer.d_pointer();
+	cudaFree(deviceNumbers);
+	free(hostNumbers);
 }
 
 float3 Raytracing::normalizedVector(float3 vector) {
-	auto magnitude = static_cast<float>(sqrt(pow(vector.x, 2) + pow(vector.y, 2) + pow(vector.z, 2)));
+	auto magnitude = static_cast<float>(sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z));
 
 	return make_float3(vector.x / magnitude, vector.y / magnitude, vector.z / magnitude);
 }
