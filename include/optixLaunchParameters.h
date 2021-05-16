@@ -23,6 +23,7 @@ struct PerRayData {
 	float3 xAxis{};
 	float3 yAxis{};
 	colorVector color;
+	float energy = 1;
 	bool light{}; // Was it a light source
 };
 
@@ -45,7 +46,7 @@ struct OptixLaunchParameters {
 
 	float *mutationNumbers{};
 
-	unsigned long *energyPerPixel{}; // Energy level per pixel
+	float *energyPerPixel{}; // Energy level per pixel
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H

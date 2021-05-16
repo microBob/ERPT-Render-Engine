@@ -12,8 +12,7 @@
 #include "optixLaunchParameters.h"
 #include "curand.h"
 #include "CUDABuffer.h"
-#include <vector>
-#include <cassert>
+#include "main.h"
 
 
 //// SECTION: Structs
@@ -27,6 +26,7 @@ struct TriangleMesh {
 	vector<float3> vertices;
 	vector<uint3> indices;
 	colorVector color;
+	float energy = 1;
 	MeshKind meshKind;
 };
 

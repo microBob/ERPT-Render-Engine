@@ -243,6 +243,7 @@ void Raytracing::createShaderBindingTable() {
 		record.data.vertex = (float3 *) vertexBuffer[i].d_pointer();
 		record.data.index = (int3 *) indexBuffer[i].d_pointer();
 		record.data.color = triangleMeshes[i].color;
+		record.data.energy = triangleMeshes[i].energy;
 		record.data.kind = triangleMeshes[i].meshKind;
 		hitgroupRecords.push_back(record);
 	}
@@ -264,9 +265,11 @@ void Raytracing::setFrameSize(const uint2 &newSize) {
 void Raytracing::optixRender(unsigned long numSamples, unsigned long long int seed) {
 	createDataBuffers(numSamples);
 
+	auto renderStartTime = high_resolution_clock::now();
+
 	for (unsigned long i = 1; i <= numSamples; ++i) {
 		// update and (re)upload optix launch parameters
-		generateMutationNumbers((i + 1) * (seed + 1));
+		generateMutationNumbers(i * (seed + 1));
 		optixLaunchParameters.samples.index = i;
 		optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
@@ -285,6 +288,15 @@ void Raytracing::optixRender(unsigned long numSamples, unsigned long long int se
 			exit(2);
 		}
 	}
+
+	auto renderEndTime = high_resolution_clock::now();
+
+	auto totalRenderTime =
+		static_cast<float>(duration_cast<milliseconds>(renderEndTime - renderStartTime).count()) / 1000.0f;
+
+	cout << endl << "Total render time: " << totalRenderTime << " sec." << endl;
+	cout << "Average frame time: " << static_cast<float>(totalRenderTime * 1000) / static_cast<float>(numSamples)
+	     << " ms" << endl << endl;
 }
 
 void Raytracing::downloadRender(float *pixData) {
@@ -424,12 +436,8 @@ void Raytracing::createDataBuffers(unsigned long numSamples) {
 		optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y;
 
 	// Set energy per pixel
-	energyPerPixelBuffer.resize(frameSize * sizeof(unsigned long));
-	optixLaunchParameters.energyPerPixel = static_cast<unsigned long *>(energyPerPixelBuffer.d_ptr);
-
-	// Setup mutation numbers
-//	mutationNumbersBuffer.resize(frameSize * sizeof(float));
-//	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
+	energyPerPixelBuffer.resize(frameSize * sizeof(float));
+	optixLaunchParameters.energyPerPixel = static_cast<float *>(energyPerPixelBuffer.d_ptr);
 
 	// Set total sample numbers
 	optixLaunchParameters.samples.total = numSamples;

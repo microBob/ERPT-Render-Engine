@@ -71,6 +71,8 @@ extern "C" int main() {
 		// Color
 		if (curMeshEncode.meshKind == Mesh) {
 			curMeshEncode.color = {0.2f, 0.8f, 0.2f};
+		} else {
+			curMeshEncode.energy = 2;
 		}
 
 		// Add to triangleMeshes
@@ -101,7 +103,7 @@ extern "C" int main() {
 	}
 
 	//// SECTION: OptiX render
-	raytracing.optixRender(1000, 0);
+	raytracing.optixRender(500, 0);
 	raytracing.downloadRender(pixData);
 
 

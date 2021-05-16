@@ -56,11 +56,18 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const unsigned int ix = optixGetLaunchIndex().x;
 	const unsigned int iy = optixGetLaunchIndex().y;
 	const unsigned int mutationNumberIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
-	const unsigned int screenX = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) *
-	                                     optixLaunchParameters.mutationNumbers[mutationNumberIndex]);
-	const unsigned int screenY = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) *
-	                                     optixLaunchParameters.mutationNumbers[mutationNumberIndex + 1]);
-	const unsigned int pixelIndex = mutationNumberIndex; //screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
+	unsigned int screenX = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) *
+	                               optixLaunchParameters.mutationNumbers[mutationNumberIndex]);
+	unsigned int screenY = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) *
+	                               optixLaunchParameters.mutationNumbers[mutationNumberIndex + 1]);
+	unsigned int pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
+
+	// Force every pixel to be accounted for at least once
+	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
+		screenX = ix;
+		screenY = iy;
+		pixelIndex = mutationNumberIndex;
+	}
 
 	const auto &camera = optixLaunchParameters.camera;
 
@@ -72,9 +79,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	// Create screen ray
 	const auto screen = make_float2(
-		(static_cast<float>(ix) + 0.5f) /
+		(static_cast<float>(screenX) + 0.5f) /
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-		(static_cast<float>(iy) + 0.5f) /
+		(static_cast<float>(screenY) + 0.5f) /
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
 	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
 	auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
@@ -112,7 +119,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
-			optixLaunchParameters.energyPerPixel[pixelIndex]++;
+			optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
 		} else { // Else, continue with second ray
 			/// Second ray
 			// Create ray
@@ -151,7 +158,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 			// If there's light, increment data
 			if (rayData.light) {
-				optixLaunchParameters.energyPerPixel[pixelIndex]++;
+				optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
 			}
 		}
 	}
@@ -202,14 +209,14 @@ extern "C" __global__ void __closesthit__radiance() {
 
 	// Second Axis
 	const float3 yAxis = normalizeVectorGPU(
-		vectorCrossProductGPU(make_float3(-1, 2, 3), normalAxis));
+		vectorCrossProductGPU(optixLaunchParameters.camera.direction, normalAxis));
 
 	// Third Axis
 	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));
 
 	// Encode per ray data
 	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
-	perRayData = {hitLocation, normalAxis, xAxis, yAxis, sbtData.color, sbtData.kind == Light};
+	perRayData = {hitLocation, normalAxis, xAxis, yAxis, sbtData.color, sbtData.energy, sbtData.kind == Light};
 }
 extern "C" __global__ void __anyhit__radiance() {}
 
