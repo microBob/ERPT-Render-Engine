@@ -7,6 +7,7 @@
 
 //#include "optix.h"
 #include "optix_stubs.h"
+#include "curand_kernel.h"
 #include "types.h"
 
 struct TriangleMeshSBTData {
@@ -23,6 +24,7 @@ struct PerRayData {
 	float3 xAxis{};
 	float3 yAxis{};
 	colorVector color;
+	float energy = 1;
 	bool light{}; // Was it a light source
 };
 
@@ -41,11 +43,14 @@ struct OptixLaunchParameters {
 		unsigned long total;
 	} samples{};
 
+	unsigned int traceDepth{};
+
 	OptixTraversableHandle optixTraversableHandle{};
 
-	float *mutationNumbers{};
+	float *curMutationNumbers{};
+	float *newMutationNumbers{};
 
-	unsigned long *energyPerPixel{}; // Energy level per pixel
+	float *energyPerPixel{}; // Energy level per pixel
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H

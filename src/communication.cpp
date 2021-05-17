@@ -97,13 +97,13 @@ void Communication::ConvertAndSend(float *pixData, size_t pixDataSize) const {
 	writer.EndArray();
 
 	auto afterConvert = high_resolution_clock::now();
-	int convertDur = duration_cast<milliseconds>(afterConvert - beforeConvert).count();
+	unsigned long convertDur = duration_cast<milliseconds>(afterConvert - beforeConvert).count();
 	cout << "Conversion Duration: " << convertDur << endl;
 
 	write(sock, json.GetString(), json.GetLength());
 
 	auto afterSend = high_resolution_clock::now();
-	int sendDur = duration_cast<milliseconds>(afterSend - afterConvert).count();
+	unsigned long sendDur = duration_cast<milliseconds>(afterSend - afterConvert).count();
 
 	cout << "Message sent! Took: " << sendDur << endl;
 }

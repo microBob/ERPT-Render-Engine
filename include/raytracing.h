@@ -12,8 +12,7 @@
 #include "optixLaunchParameters.h"
 #include "curand.h"
 #include "CUDABuffer.h"
-#include <vector>
-#include <cassert>
+#include "main.h"
 
 
 //// SECTION: Structs
@@ -27,6 +26,7 @@ struct TriangleMesh {
 	vector<float3> vertices;
 	vector<uint3> indices;
 	colorVector color;
+	float energy = 1;
 	MeshKind meshKind;
 };
 
@@ -38,7 +38,7 @@ public:
 
 	void setFrameSize(const uint2 &newSize);
 
-	void optixRender(unsigned long numSamples, unsigned long long int seed);
+	void optixRender(unsigned long numSamples, unsigned int traceDepth = 1, unsigned long long int seed = 0);
 
 	void downloadRender(float *pixData);
 
@@ -67,7 +67,8 @@ protected:
 
 	// OptiX parameters
 	void createDataBuffers(unsigned long numSamples);
-	void generateMutationNumbers(unsigned long long int seed);
+
+	void generateMutationNumbers(unsigned long long int seed, unsigned int traceDepth, bool forCur = 0);
 
 private:
 	static float3 normalizedVector(float3 vector);
@@ -113,7 +114,8 @@ protected:
 
 	vector<CUDABuffer> indexBuffer;
 
-	CUDABuffer mutationNumbersBuffer;
+	CUDABuffer curMutationNumbersBuffer;
+	CUDABuffer newMutationNumbersBuffer;
 
 	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
 
