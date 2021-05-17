@@ -51,6 +51,10 @@ static __forceinline__ __device__ T *getPerRayData() {
 }
 
 /// Ray generation program
+__device__ float mutatedMutationNumber(unsigned int mutationNumberIndex, unsigned int indexShift) {
+	return optixLaunchParameters.curMutationNumbers[mutationNumberIndex] +
+	       0.05f * (optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] - 0.5f);
+}
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
 	const unsigned int ix = optixGetLaunchIndex().x;
@@ -122,6 +126,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 			optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
 		} else { // Else, continue with second ray
 			/// Reflected ray
+			bool successfulRay = false;
 			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
 				// Create ray
 				const auto newRay = make_float3(
@@ -164,8 +169,64 @@ extern "C" __global__ void __raygen__renderFrame() {
 				}
 				// If there's light, increment data
 				if (rayData.light) {
-					optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
+					successfulRay = true;
 					break;
+				}
+			}
+
+			if (successfulRay) { // Create proposal ray
+				//TODO: increment curMutation ray rn?
+
+				// Create slightly different start value
+				const float2 newScreenStart = make_float2(mutatedMutationNumber(mutationNumberIndex, 0),
+				                                          mutatedMutationNumber(mutationNumberIndex, 1));
+				// Create second screen ray
+				screen = make_float2(
+					(static_cast<float>(newScreenStart.x) + 0.5f) /
+					static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
+					(static_cast<float>(newScreenStart.y) + 0.5f) /
+					static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+				screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
+				horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
+				                                              screenMinus.x * camera.horizontal.y,
+				                                              screenMinus.x * camera.horizontal.z);
+				verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
+				                                            screenMinus.y * camera.vertical.y,
+				                                            screenMinus.y * camera.vertical.z);
+				rawRayDirection = make_float3(
+					camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
+					camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
+					camera.direction.z + horizontalTimesScreenMinus.z + verticalTimesScreenMinus.z);
+
+				rayOrigin = camera.position;
+				rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
+
+				// Trace
+				optixTrace(optixLaunchParameters.optixTraversableHandle,
+				           rayOrigin,
+				           rayDirectionNormalized,
+				           0.001f, // Needs to have gone somewhere
+				           1e20f,
+				           0.0f,
+				           OptixVisibilityMask(255),
+				           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+				           SURFACE_RAY_TYPE,
+				           RAY_TYPE_COUNT,
+				           SURFACE_RAY_TYPE,
+				           payload0,
+				           payload1);
+
+				colorVector secondBaseColor;
+				if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
+					secondBaseColor = rayData.color; // Set base color
+
+					if (rayData.light) {
+						// TODO: increment both places?
+					} else { // Else, continue with bounce
+						// TODO: continue with proposed ray
+						bool proposedRaySuccessful = false;
+					}
+
 				}
 			}
 		}
@@ -189,6 +250,14 @@ extern "C" __global__ void __miss__radiance() {
 /// Hit program
 extern "C" __global__ void __closesthit__radiance() {
 	const TriangleMeshSBTData &sbtData = *(const TriangleMeshSBTData *) optixGetSbtDataPointer();
+	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
+
+	// Return early if this was a light source
+	if (sbtData.kind == Light) {
+		perRayData = {make_float3(0, 0, 0), make_float3(1, 0, 0), make_float3(0, 0, 0), make_float3(0, 0, 0),
+		              sbtData.color, sbtData.energy, true};
+		return;
+	}
 
 	// Essential hit data
 	const float3 rayDir = optixGetWorldRayDirection();
@@ -223,7 +292,6 @@ extern "C" __global__ void __closesthit__radiance() {
 	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));
 
 	// Encode per ray data
-	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
 	perRayData = {hitLocation, normalAxis, xAxis, yAxis, sbtData.color, sbtData.energy, sbtData.kind == Light};
 }
 extern "C" __global__ void __anyhit__radiance() {}
