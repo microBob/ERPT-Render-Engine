@@ -262,14 +262,18 @@ void Raytracing::setFrameSize(const uint2 &newSize) {
 	optixLaunchParameters.frame.frameColorBuffer = static_cast<colorVector *>(frameColorBuffer.d_ptr);
 }
 
-void Raytracing::optixRender(unsigned long numSamples, unsigned long long int seed) {
+void Raytracing::optixRender(unsigned long numSamples, unsigned int traceDepth, unsigned long long int seed) {
 	createDataBuffers(numSamples);
 
 	auto renderStartTime = high_resolution_clock::now();
 
+//	generateMutationNumbers(seed + 1, traceDepth, true);
+
+	optixLaunchParameters.traceDepth = traceDepth;
+
 	for (unsigned long i = 1; i <= numSamples; ++i) {
 		// update and (re)upload optix launch parameters
-		generateMutationNumbers(i * (seed + 1));
+		generateMutationNumbers(i * (seed + 1), traceDepth, true);
 		optixLaunchParameters.samples.index = i;
 		optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
@@ -443,12 +447,12 @@ void Raytracing::createDataBuffers(unsigned long numSamples) {
 	optixLaunchParameters.samples.total = numSamples;
 }
 
-void Raytracing::generateMutationNumbers(unsigned long long int seed) {
+void Raytracing::generateMutationNumbers(unsigned long long int seed, unsigned int traceDepth, bool forCur) {
 	// Setup
 	curandGenerator_t gen;
 	float *deviceNumbers, *hostNumbers;
 	size_t numNumbers = optixLaunchParameters.frame.frameBufferSize.x * optixLaunchParameters.frame.frameBufferSize.y *
-	                    (2 + 3); // screen size * (starting loc + 3 * bounces)
+	                    (2 + 2 * traceDepth); // screen size * (starting loc + 2 * bounces)
 
 	// Allocate memory for data
 	hostNumbers = static_cast<float *>(calloc(numNumbers, sizeof(float)));
@@ -465,9 +469,15 @@ void Raytracing::generateMutationNumbers(unsigned long long int seed) {
 	// Copy to host and upload
 	cudaMemcpy(hostNumbers, deviceNumbers, numNumbers * sizeof(float), cudaMemcpyDeviceToHost);
 	vector<float> vectorizedMutationNumbersArray{hostNumbers, hostNumbers + numNumbers};
-	mutationNumbersBuffer.free();
-	mutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
-	optixLaunchParameters.mutationNumbers = static_cast<float *>(mutationNumbersBuffer.d_ptr);
+	if (forCur) {
+		curMutationNumbersBuffer.free();
+		curMutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
+		optixLaunchParameters.curMutationNumbers = static_cast<float *>(curMutationNumbersBuffer.d_ptr);
+	} else {
+		newMutationNumbersBuffer.free();
+		newMutationNumbersBuffer.alloc_and_upload(vectorizedMutationNumbersArray);
+		optixLaunchParameters.newMutationNumbers = static_cast<float *>(newMutationNumbersBuffer.d_ptr);
+	}
 
 	cudaFree(deviceNumbers);
 	free(hostNumbers);

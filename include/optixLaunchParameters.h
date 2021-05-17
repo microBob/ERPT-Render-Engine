@@ -7,6 +7,7 @@
 
 //#include "optix.h"
 #include "optix_stubs.h"
+#include "curand_kernel.h"
 #include "types.h"
 
 struct TriangleMeshSBTData {
@@ -42,9 +43,12 @@ struct OptixLaunchParameters {
 		unsigned long total;
 	} samples{};
 
+	unsigned int traceDepth{};
+
 	OptixTraversableHandle optixTraversableHandle{};
 
-	float *mutationNumbers{};
+	float *curMutationNumbers{};
+	float *newMutationNumbers{};
 
 	float *energyPerPixel{}; // Energy level per pixel
 };
