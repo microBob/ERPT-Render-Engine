@@ -52,9 +52,10 @@ static __forceinline__ __device__ T *getPerRayData() {
 
 /// Ray generation program
 __device__ float mutatedMutationNumber(unsigned int mutationNumberIndex, unsigned int indexShift) {
-	return optixLaunchParameters.curMutationNumbers[mutationNumberIndex] +
-	       0.05f * (optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] - 0.5f);
+	return fabsf(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] +
+	             0.05f * (optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] - 0.5f));
 }
+
 extern "C" __global__ void __raygen__renderFrame() {
 	// Get index and camera
 	const unsigned int ix = optixGetLaunchIndex().x;
@@ -82,7 +83,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 	packPointer(&rayData, payload0, payload1);
 
 	// Create base screen ray
-	const auto screen = make_float2(
+	auto screen = make_float2(
 		(static_cast<float>(screenX) + 0.5f) /
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
 		(static_cast<float>(screenY) + 0.5f) /
@@ -126,16 +127,14 @@ extern "C" __global__ void __raygen__renderFrame() {
 			optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
 		} else { // Else, continue with second ray
 			/// Reflected ray
-			bool successfulRay = false;
+			bool raySuccessful = false;
 			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
 				// Create ray
-				const auto newRay = make_float3(
-					cospif(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2]),
-					cospif(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2 + 1]),
-					fabsf(cospif(
-						optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 4])));
-				const float r = sqrt(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2]);
-				const float phi = 2 * 3.1415f * optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 3];
+				const float r = sqrt(
+					optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 * depthIndex * 2]);
+				const float phi = 2 * 3.1415f *
+				                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 * depthIndex * 2 +
+				                                                           1];
 				const float circleX = r * cos(phi);
 				const float circleY = r * sin(phi);
 				const float circleZ = sqrt(1 - (r * r));
@@ -169,30 +168,27 @@ extern "C" __global__ void __raygen__renderFrame() {
 				}
 				// If there's light, increment data
 				if (rayData.light) {
-					successfulRay = true;
+					raySuccessful = true;
 					break;
 				}
 			}
 
-			if (successfulRay) { // Create proposal ray
-				//TODO: increment curMutation ray rn?
-
-				// Create slightly different start value
-				const float2 newScreenStart = make_float2(mutatedMutationNumber(mutationNumberIndex, 0),
-				                                          mutatedMutationNumber(mutationNumberIndex, 1));
+			if (raySuccessful) { // Create proposal ray
 				// Create second screen ray
+				const float2 proposedScreenXY = make_float2(mutatedMutationNumber(mutationNumberIndex, 0),
+				                                            mutatedMutationNumber(mutationNumberIndex, 1));
 				screen = make_float2(
-					(static_cast<float>(newScreenStart.x) + 0.5f) /
+					(static_cast<float>(proposedScreenXY.x) + 0.5f) /
 					static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-					(static_cast<float>(newScreenStart.y) + 0.5f) /
+					(static_cast<float>(proposedScreenXY.y) + 0.5f) /
 					static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
 				screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
 				horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
-				                                              screenMinus.x * camera.horizontal.y,
-				                                              screenMinus.x * camera.horizontal.z);
+				                                         screenMinus.x * camera.horizontal.y,
+				                                         screenMinus.x * camera.horizontal.z);
 				verticalTimesScreenMinus = make_float3(screenMinus.y * camera.vertical.x,
-				                                            screenMinus.y * camera.vertical.y,
-				                                            screenMinus.y * camera.vertical.z);
+				                                       screenMinus.y * camera.vertical.y,
+				                                       screenMinus.y * camera.vertical.z);
 				rawRayDirection = make_float3(
 					camera.direction.x + horizontalTimesScreenMinus.x + verticalTimesScreenMinus.x,
 					camera.direction.y + horizontalTimesScreenMinus.y + verticalTimesScreenMinus.y,
@@ -220,13 +216,90 @@ extern "C" __global__ void __raygen__renderFrame() {
 				if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
 					secondBaseColor = rayData.color; // Set base color
 
+					bool proposedRaySuccessful = false;
 					if (rayData.light) {
-						// TODO: increment both places?
+						proposedRaySuccessful = true;
 					} else { // Else, continue with bounce
-						// TODO: continue with proposed ray
-						bool proposedRaySuccessful = false;
+						/// Reflected ray
+						for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
+							// Create ray
+							const float r = sqrt(mutatedMutationNumber(mutationNumberIndex + 2, depthIndex * 2));
+							const float phi =
+								2 * 3.1415f * mutatedMutationNumber(mutationNumberIndex + 2, depthIndex * 2 + 1);
+							const float circleX = r * cos(phi);
+							const float circleY = r * sin(phi);
+							const float circleZ = sqrt(1 - (r * r));
+							const float3 newDirection = make_float3(
+								rayData.xAxis.x * circleX + rayData.yAxis.x * circleY + rayData.normal.x * circleZ,
+								rayData.xAxis.y * circleX + rayData.yAxis.y * circleY + rayData.normal.y * circleZ,
+								rayData.xAxis.z * circleX + rayData.yAxis.z * circleY + rayData.normal.z * circleZ);
+
+							rayOrigin = rayData.location;
+							rayDirectionNormalized = newDirection;//normalizeVectorGPU(newDirection);
+
+
+							// Trace
+							optixTrace(optixLaunchParameters.optixTraversableHandle,
+							           rayOrigin,
+							           rayDirectionNormalized,
+							           0.001f, // Needs to have gone somewhere
+							           1e20f,
+							           0.0f,
+							           OptixVisibilityMask(255),
+							           OPTIX_RAY_FLAG_DISABLE_ANYHIT,
+							           SURFACE_RAY_TYPE,
+							           RAY_TYPE_COUNT,
+							           SURFACE_RAY_TYPE,
+							           payload0,
+							           payload1);
+
+							// Stop if there was a miss
+							if (rayData.normal.x + rayData.normal.y + rayData.normal.z == 0) {
+								break;
+							}
+							// Indicated there's a light and update mutation numbers
+							if (rayData.light) {
+								proposedRaySuccessful = true;
+
+								optixLaunchParameters.curMutationNumbers[mutationNumberIndex] = proposedScreenXY.x;
+								optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1] = proposedScreenXY.y;
+								for (int i = 0; i < depthIndex; i++) {
+									optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 +
+									                                         i * 2] = mutatedMutationNumber(
+										mutationNumberIndex + 2, i * 2);
+									optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + i * 2 +
+									                                         1] = mutatedMutationNumber(
+										mutationNumberIndex + 2, i * 2 + 1);
+								}
+
+								break;
+							}
+						}
 					}
 
+					// Update color at that pixel
+					if (proposedRaySuccessful) {
+						const float baseColorValueSum = secondBaseColor.r + secondBaseColor.g + secondBaseColor.b;
+						screenX = llrintf(
+							static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) * proposedScreenXY.x);
+						screenY = llrintf(
+							static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * proposedScreenXY.y);
+						pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
+						optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r +=
+							secondBaseColor.r / baseColorValueSum;
+						optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g +=
+							secondBaseColor.g / baseColorValueSum;
+						optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b +=
+							secondBaseColor.b / baseColorValueSum;
+					} else {
+						const float baseColorValueSum = baseColor.r + baseColor.g + baseColor.b;
+						optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r +=
+							baseColor.r / baseColorValueSum;
+						optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g +=
+							baseColor.g / baseColorValueSum;
+						optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b +=
+							baseColor.b / baseColorValueSum;
+					}
 				}
 			}
 		}
@@ -234,11 +307,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	// Average out brightness
 	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[pixelIndex]) /
-		                        static_cast<float>(optixLaunchParameters.samples.total);
-		colorVector pixelColor = {intensity * baseColor.r, intensity * baseColor.g, intensity * baseColor.b};
-
-		optixLaunchParameters.frame.frameColorBuffer[pixelIndex] = pixelColor;
+		optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r /= static_cast<float>(optixLaunchParameters.samples.total);
+		optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g /= static_cast<float>(optixLaunchParameters.samples.total);
+		optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b /= static_cast<float>(optixLaunchParameters.samples.total);
 	}
 }
 
