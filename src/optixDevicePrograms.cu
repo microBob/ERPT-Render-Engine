@@ -115,11 +115,10 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	colorVector baseColor;
 	if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
-		baseColor = rayData.color; // Set base color
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
-			optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
+//			optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
 		} else { // Else, continue with second ray
 			/// Reflected ray
 			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
@@ -163,8 +162,13 @@ extern "C" __global__ void __raygen__renderFrame() {
 					break;
 				}
 				// If there's light, increment data
+				if (depthIndex == 1) {
+					baseColor = rayData.color;
+				}
 				if (rayData.light) {
-					optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
+					if (depthIndex > 0) {
+						optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
+					}
 					break;
 				}
 			}
@@ -213,18 +217,20 @@ extern "C" __global__ void __closesthit__radiance() {
 	const auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
 	const auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
 	const float3 normalAxis = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
-	float normalDotDir = normalAxis.x * rayDir.x + normalAxis.y * rayDir.y + normalAxis.z * rayDir.z;
+	const colorVector normalColor = {(normalAxis.x + 1) / 2, (normalAxis.y + 1) / 2, (normalAxis.z + 1) / 2};
 
 	// Second Axis
+	// TODO: causing bad indirect lighting
 	const float3 yAxis = normalizeVectorGPU(
-		vectorCrossProductGPU(optixLaunchParameters.camera.direction, normalAxis));
+		vectorCrossProductGPU(make_float3(1,-1,-1), normalAxis));
+	const colorVector yAxisColor = {(yAxis.x + 1) / 2, (yAxis.y + 1) / 2, (yAxis.z + 1) / 2};
 
 	// Third Axis
 	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));
 
 	// Encode per ray data
 	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
-	perRayData = {hitLocation, normalAxis, xAxis, yAxis, sbtData.color, sbtData.energy, sbtData.kind == Light};
+	perRayData = {hitLocation, normalAxis, xAxis, yAxis, normalColor, sbtData.energy, sbtData.kind == Light};
 }
 extern "C" __global__ void __anyhit__radiance() {}
 
