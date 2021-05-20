@@ -120,7 +120,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	colorVector baseColor;
 	if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
-		baseColor = rayData.color; // Set base color
+		baseColor = rayData.color;
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
@@ -167,6 +167,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 					break;
 				}
 				// If there's light, increment data
+//				if (depthIndex == 1) {
+//					baseColor = rayData.color;
+//				}
 				if (rayData.light) {
 					raySuccessful = true;
 					break;
@@ -353,11 +356,18 @@ extern "C" __global__ void __closesthit__radiance() {
 	const auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
 	const auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
 	const float3 normalAxis = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
-	float normalDotDir = normalAxis.x * rayDir.x + normalAxis.y * rayDir.y + normalAxis.z * rayDir.z;
+	const colorVector normalColor = {(normalAxis.x + 1) / 2, (normalAxis.y + 1) / 2, (normalAxis.z + 1) / 2};
 
 	// Second Axis
+	// TODO: causing bad indirect lighting
+	const unsigned int ix = optixGetLaunchIndex().x;
+	const unsigned int iy = optixGetLaunchIndex().y;
+	const unsigned int mutationNumberIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 	const float3 yAxis = normalizeVectorGPU(
-		vectorCrossProductGPU(optixLaunchParameters.camera.direction, normalAxis));
+		vectorCrossProductGPU(make_float3(optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
+		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1],
+		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2]),
+		                      normalAxis));
 
 	// Third Axis
 	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));
