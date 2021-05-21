@@ -53,7 +53,7 @@ static __forceinline__ __device__ T *getPerRayData() {
 /// Ray generation program
 __device__ float mutatedMutationNumber(unsigned int mutationNumberIndex, unsigned int indexShift) {
 	return fabsf(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] +
-	             0.05f * (optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] - 0.5f));
+	             0.1f * (2 * optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] - 1.0f));
 }
 
 extern "C" __global__ void __raygen__renderFrame() {
@@ -102,7 +102,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	float3 rayOrigin = camera.position;
 	float3 rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
-	atomicAdd(&optixLaunchParameters.pixelVisits[pixelIndex], 1);
 
 	// Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
@@ -133,9 +132,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
 				// Create ray
 				const float r = sqrt(
-					optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 * depthIndex * 2]);
+					optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2]);
 				const float phi = 2 * 3.1415f *
-				                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 * depthIndex * 2 +
+				                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2 +
 				                                                           1];
 				const float circleX = r * cos(phi);
 				const float circleY = r * sin(phi);
@@ -182,10 +181,16 @@ extern "C" __global__ void __raygen__renderFrame() {
 		// Create second screen ray
 		const float2 proposedScreenXY = make_float2(mutatedMutationNumber(mutationNumberIndex, 0),
 		                                            mutatedMutationNumber(mutationNumberIndex, 1));
+		const auto proposedScreenX = llrintf(
+			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) * proposedScreenXY.x);
+		const auto proposedScreenY = llrintf(
+			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * proposedScreenXY.y);
+		const auto proposedPixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
+
 		screen = make_float2(
-			(static_cast<float>(proposedScreenXY.x) + 0.5f) /
+			(static_cast<float>(proposedScreenX) + 0.5f) /
 			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-			(static_cast<float>(proposedScreenXY.y) + 0.5f) /
+			(static_cast<float>(proposedScreenY) + 0.5f) /
 			static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
 		screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
 		horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
@@ -278,7 +283,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 							                                         1] = mutatedMutationNumber(
 								mutationNumberIndex + 2, i * 2 + 1);
 						}
-
 						break;
 					}
 				}
@@ -288,20 +292,13 @@ extern "C" __global__ void __raygen__renderFrame() {
 		// Update color at that pixel
 		if (proposedRaySuccessful) {
 //			printf("Proposed ray\n");
-			// Recalculate pixel index for proposed ray pixel
-			screenX = llrintf(
-				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) * proposedScreenXY.x);
-			screenY = llrintf(
-				static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * proposedScreenXY.y);
-			pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
-
 			const float baseColorValueSum = (secondBaseColor.r + secondBaseColor.g + secondBaseColor.b) *
 			                                static_cast<float>(optixLaunchParameters.samples.total);
-			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r,
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].r,
 			          secondBaseColor.r / baseColorValueSum);
-			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g,
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].g,
 			          secondBaseColor.g / baseColorValueSum);
-			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b,
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].b,
 			          secondBaseColor.b / baseColorValueSum);
 		} else {
 //			printf("Base ray\n");
