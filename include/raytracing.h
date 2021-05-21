@@ -120,6 +120,7 @@ protected:
 	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
 
 	CUDABuffer energyPerPixelBuffer;
+	CUDABuffer pixelVisitsBuffer;
 };
 
 //// SECTION: Shader binding table structs

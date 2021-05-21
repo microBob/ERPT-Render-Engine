@@ -102,6 +102,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	float3 rayOrigin = camera.position;
 	float3 rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
+	atomicAdd(&optixLaunchParameters.pixelVisits[pixelIndex], 1);
 
 	// Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
@@ -168,9 +169,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 					break;
 				}
 				// If there's light, increment data
-//				if (depthIndex == 1) {
-//					baseColor = rayData.color;
-//				}
 				if (rayData.light) {
 					firstRaySuccessful = true;
 					break;
@@ -370,6 +368,7 @@ extern "C" __global__ void __closesthit__radiance() {
 		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1],
 		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2]),
 		                      normalAxis));
+//	const float3 yAxis = normalizeVectorGPU(vectorCrossProductGPU(optixLaunchParameters.camera.direction, normalAxis));
 
 	// Third Axis
 	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));

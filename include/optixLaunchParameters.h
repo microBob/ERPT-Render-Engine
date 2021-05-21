@@ -51,6 +51,7 @@ struct OptixLaunchParameters {
 	float *newMutationNumbers{};
 
 	float *energyPerPixel{}; // Energy level per pixel
+	unsigned int *pixelVisits{}; // Numbers of times a pixel is the source (not equal to sample count)
 };
 
 #endif //ERPT_RENDER_ENGINE_OPTIXLAUNCHPARAMETERS_H

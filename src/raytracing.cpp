@@ -443,6 +443,10 @@ void Raytracing::createDataBuffers(unsigned long numSamples) {
 	energyPerPixelBuffer.resize(frameSize * sizeof(float));
 	optixLaunchParameters.energyPerPixel = static_cast<float *>(energyPerPixelBuffer.d_ptr);
 
+	// Set pixel visits
+	pixelVisitsBuffer.resize(frameSize * sizeof(unsigned int));
+	optixLaunchParameters.pixelVisits = static_cast<unsigned int *>(pixelVisitsBuffer.d_ptr);
+
 	// Set total sample numbers
 	optixLaunchParameters.samples.total = numSamples;
 }
