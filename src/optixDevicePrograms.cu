@@ -299,22 +299,19 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 			const float baseColorValueSum = (secondBaseColor.r + secondBaseColor.g + secondBaseColor.b) *
 			                                static_cast<float>(optixLaunchParameters.samples.total);
-			optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r +=
-				secondBaseColor.r / baseColorValueSum;
-			optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g +=
-				secondBaseColor.g / baseColorValueSum;
-			optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b +=
-				secondBaseColor.b / baseColorValueSum;
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r,
+			          secondBaseColor.r / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g,
+			          secondBaseColor.g / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b,
+			          secondBaseColor.b / baseColorValueSum);
 		} else {
 //			printf("Base ray\n");
 			const float baseColorValueSum =
 				(baseColor.r + baseColor.g + baseColor.b) * static_cast<float>(optixLaunchParameters.samples.total);
-			optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r +=
-				baseColor.r / baseColorValueSum;
-			optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g +=
-				baseColor.g / baseColorValueSum;
-			optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b +=
-				baseColor.b / baseColorValueSum;
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r, baseColor.r / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g, baseColor.g / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b, baseColor.b / baseColorValueSum);
 		}
 	}
 }
