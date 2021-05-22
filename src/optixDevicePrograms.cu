@@ -62,13 +62,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 	                               optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1]);
 	unsigned int pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
 
-	// Force every pixel to be accounted for at least once
-	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		screenX = ix;
-		screenY = iy;
-		pixelIndex = mutationNumberIndex;
-	}
-
 	const auto &camera = optixLaunchParameters.camera;
 
 	/// Starting ray from camera
@@ -115,12 +108,13 @@ extern "C" __global__ void __raygen__renderFrame() {
 	           payload1);
 
 	colorVector baseColor;
+	bool raySuccessful;
 	if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
 		baseColor = rayData.color;
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
-			atomicAdd(&optixLaunchParameters.energyPerPixel[pixelIndex], rayData.energy);
+			raySuccessful = true;
 		} else { // Else, continue with second ray
 			/// Reflected ray
 			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
@@ -162,22 +156,21 @@ extern "C" __global__ void __raygen__renderFrame() {
 				}
 				// If there's light, increment data
 				if (rayData.light) {
-					if (rayData.energy < 0) {
-						printf("Energy: %f\n", rayData.energy);
-					}
+					raySuccessful = true;
 					atomicAdd(&optixLaunchParameters.energyPerPixel[pixelIndex], rayData.energy);
 					break;
 				}
 			}
 		}
-	}
 
-	// Average out brightness
-	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[pixelIndex]) /
-		                        static_cast<float>(optixLaunchParameters.pixelVisits[pixelIndex]);
-		colorVector pixelColor = {intensity * baseColor.r, intensity * baseColor.g, intensity * baseColor.b};
-		optixLaunchParameters.frame.frameColorBuffer[pixelIndex] = pixelColor;
+		if (raySuccessful) {
+			const float colorSum =
+				(baseColor.r + baseColor.g + baseColor.b) / rayData.energy *
+				static_cast<float>(optixLaunchParameters.samples.total);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r, baseColor.r / colorSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g, baseColor.g / colorSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b, baseColor.b / colorSum);
+		}
 	}
 }
 
