@@ -67,13 +67,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 	                               optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1]);
 	unsigned int pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
 
-	// Force every pixel to be accounted for at least once
-	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		screenX = ix;
-		screenY = iy;
-		pixelIndex = mutationNumberIndex;
-	}
-
 	const auto &camera = optixLaunchParameters.camera;
 
 	/// Starting ray from camera
@@ -275,7 +268,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 						// Copy used mutation numbers into curMutations
 						optixLaunchParameters.curMutationNumbers[mutationNumberIndex] = proposedScreenXY.x;
 						optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1] = proposedScreenXY.y;
-						for (int i = 0; i < depthIndex; i++) {
+						for (int i = 0; i < depthIndex; ++i) {
 							optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 +
 							                                         i * 2] = mutatedMutationNumber(
 								mutationNumberIndex + 2, i * 2);
@@ -283,6 +276,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 							                                         1] = mutatedMutationNumber(
 								mutationNumberIndex + 2, i * 2 + 1);
 						}
+						printf("Copied Mutations\n");
 						break;
 					}
 				}
@@ -291,9 +285,10 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 		// Update color at that pixel
 		if (proposedRaySuccessful) {
-//			printf("Proposed ray\n");
-			const float baseColorValueSum = (secondBaseColor.r + secondBaseColor.g + secondBaseColor.b) *
-			                                static_cast<float>(optixLaunchParameters.samples.total);
+			printf("Proposed ray\n");
+			const float baseColorValueSum =
+				(secondBaseColor.r + secondBaseColor.g + secondBaseColor.b) / rayData.energy *
+				static_cast<float>(optixLaunchParameters.samples.total);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].r,
 			          secondBaseColor.r / baseColorValueSum);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].g,
@@ -301,9 +296,10 @@ extern "C" __global__ void __raygen__renderFrame() {
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].b,
 			          secondBaseColor.b / baseColorValueSum);
 		} else {
-//			printf("Base ray\n");
+			printf("Base ray\n");
 			const float baseColorValueSum =
-				(baseColor.r + baseColor.g + baseColor.b) * static_cast<float>(optixLaunchParameters.samples.total);
+				(baseColor.r + baseColor.g + baseColor.b) / rayData.energy *
+				static_cast<float>(optixLaunchParameters.samples.total);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r, baseColor.r / baseColorValueSum);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g, baseColor.g / baseColorValueSum);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b, baseColor.b / baseColorValueSum);
