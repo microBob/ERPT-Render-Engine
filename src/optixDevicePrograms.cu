@@ -120,18 +120,15 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
-			optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
+			atomicAdd(&optixLaunchParameters.energyPerPixel[pixelIndex], rayData.energy);
 		} else { // Else, continue with second ray
 			/// Reflected ray
 			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
 				// Create ray
-				const auto newRay = make_float3(
-					cospif(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2]),
-					cospif(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2 + 1]),
-					fabsf(cospif(
-						optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 4])));
-				const float r = sqrt(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2]);
-				const float phi = 2 * 3.1415f * optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 3];
+				const float r = sqrt(
+					optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2]);
+				const float phi = 2 * 3.1415f *
+				                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 3 + depthIndex * 2];
 				const float circleX = r * cos(phi);
 				const float circleY = r * sin(phi);
 				const float circleZ = sqrt(1 - (r * r));
@@ -165,6 +162,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 				}
 				// If there's light, increment data
 				if (rayData.light) {
+					if (rayData.energy < 0) {
+						printf("Energy: %f\n", rayData.energy);
+					}
 					atomicAdd(&optixLaunchParameters.energyPerPixel[pixelIndex], rayData.energy);
 					break;
 				}
@@ -177,7 +177,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[pixelIndex]) /
 		                        static_cast<float>(optixLaunchParameters.pixelVisits[pixelIndex]);
 		colorVector pixelColor = {intensity * baseColor.r, intensity * baseColor.g, intensity * baseColor.b};
-
 		optixLaunchParameters.frame.frameColorBuffer[pixelIndex] = pixelColor;
 	}
 }
