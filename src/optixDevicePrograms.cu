@@ -111,20 +111,21 @@ extern "C" __global__ void __raygen__renderFrame() {
 	bool raySuccessful;
 	if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
 		baseColor = rayData.color;
+		int depthIndex;
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
 			raySuccessful = true;
 		} else { // Else, continue with second ray
 			/// Reflected ray
-			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
+			for (depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
 				// Create ray
 				const float r = sqrt(
 					optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2]);
-				const float phi = 2 * 3.1415f *
-				                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 3 + depthIndex * 2];
-				const float circleX = r * cos(phi);
-				const float circleY = r * sin(phi);
+				const float phi =
+					2 * optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 3 + depthIndex * 2];
+				const float circleX = r * cospif(phi);
+				const float circleY = r * sinpif(phi);
 				const float circleZ = sqrt(1 - (r * r));
 				const float3 newDirection = make_float3(
 					rayData.xAxis.x * circleX + rayData.yAxis.x * circleY + rayData.normal.x * circleZ,
@@ -166,7 +167,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 		if (raySuccessful) {
 			const float colorSum =
 				(baseColor.r + baseColor.g + baseColor.b) / rayData.energy *
-				static_cast<float>(optixLaunchParameters.samples.total);
+				static_cast<float>(optixLaunchParameters.samples.total) * (depthIndex + 1) * (depthIndex + 1);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r, baseColor.r / colorSum);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g, baseColor.g / colorSum);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b, baseColor.b / colorSum);
