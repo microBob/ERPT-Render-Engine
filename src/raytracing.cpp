@@ -267,7 +267,7 @@ void Raytracing::optixRender(unsigned long numSamples, unsigned int traceDepth, 
 
 	auto renderStartTime = high_resolution_clock::now();
 
-	generateMutationNumbers(seed + 1, traceDepth, true);
+	generateMutationNumbers(seed, traceDepth, true);
 
 	optixLaunchParameters.traceDepth = traceDepth;
 

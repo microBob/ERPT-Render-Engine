@@ -52,8 +52,33 @@ static __forceinline__ __device__ T *getPerRayData() {
 
 /// Ray generation program
 __device__ float mutatedMutationNumber(unsigned int mutationNumberIndex, unsigned int indexShift) {
-	return fabsf(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] +
-	             0.1f * (2 * optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] - 1.0f));
+	float jumpSize;
+	if (optixLaunchParameters.samples.index % 50 == 0) {
+		jumpSize = 0.5f;
+	} else {
+		jumpSize = 0.01f;
+	}
+
+	float randomNumber = 1.0f - 2 * optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift];
+	float randomJump = jumpSize * randomNumber;
+
+	float mutatedNumber = optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] + randomJump;
+
+	if (mutatedNumber > 1.0f) {
+		mutatedNumber -= 1.0f;
+	} else if (mutatedNumber < 0.0f) {
+		mutatedNumber += 1.0f;
+	}
+
+	return mutatedNumber;
+
+
+//	return fminf(fabsf(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] + randomJump));
+
+//	return fminf(fabsf(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] +
+//	                   jumpSize *
+//	                   (1.0f - 2 * optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift])),
+//	             1.0f);
 }
 
 extern "C" __global__ void __raygen__renderFrame() {
@@ -304,6 +329,12 @@ extern "C" __global__ void __raygen__renderFrame() {
 			const float baseColorValueSum =
 				(secondBaseColor.r + secondBaseColor.g + secondBaseColor.b) / rayData.energy *
 				static_cast<float>(optixLaunchParameters.samples.total) / 10;
+
+//			if (pixelIndex == proposedPixelIndex) {
+//				printf("Mutated Same\n");
+//			}
+//			printf("%u vs %u\n", pixelIndex, proposedPixelIndex);
+
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].r,
 			          secondBaseColor.r / baseColorValueSum);
 			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].g,
