@@ -273,7 +273,7 @@ void Raytracing::optixRender(unsigned long numSamples, unsigned int traceDepth, 
 
 	for (unsigned long i = 1; i <= numSamples; ++i) {
 		// update and (re)upload optix launch parameters
-		generateMutationNumbers(i * (seed + 1), traceDepth);
+		generateMutationNumbers(i * (seed + 256231800), traceDepth);
 		optixLaunchParameters.samples.index = i;
 		optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
