@@ -26,10 +26,6 @@ __device__ float3 vectorCrossProductGPU(float3 vectorA, float3 vectorB) {
 	                   vectorA.x * vectorB.y - vectorA.y * vectorB.x);
 }
 
-__device__ float vectorDotProductGPU(float3 vectorA, float3 vectorB) {
-	return vectorA.x * vectorB.x + vectorA.y * vectorB.y + vectorA.z * vectorB.z;
-}
-
 /// Payload management
 static __forceinline__ __device__ void *unpackPointer(uint32_t i0, uint32_t i1) {
 	const uint64_t rawPointer = static_cast<uint64_t>(i0) << 32 | i1;
@@ -59,6 +55,7 @@ __device__ float mutatedMutationNumber(unsigned int mutationNumberIndex, unsigne
 		jumpSize = 0.005f;
 	}
 
+	// Fix (some) repeat random numbers
 	float newMutationNumberToUse;
 	if (optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] ==
 	    optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift]) {
@@ -80,19 +77,7 @@ __device__ float mutatedMutationNumber(unsigned int mutationNumberIndex, unsigne
 		mutatedNumber += 1.0f;
 	}
 
-//	if (mutatedNumber == 0.5f) {
-//		printf("> %f, %f\n", randomNumber, randomJump);
-//	}
-
 	return mutatedNumber;
-
-
-//	return fminf(fabsf(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] + randomJump));
-
-//	return fminf(fabsf(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] +
-//	                   jumpSize *
-//	                   (1.0f - 2 * optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift])),
-//	             1.0f);
 }
 
 extern "C" __global__ void __raygen__renderFrame() {
@@ -108,14 +93,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	const auto &camera = optixLaunchParameters.camera;
 
-//	if (mutationNumberIndex == 585) {
-//		printf("Access: ");
-//		for (int i = 0; i < optixLaunchParameters.traceDepth + 2; ++i) {
-//			printf("%f, ", optixLaunchParameters.curMutationNumbers[mutationNumberIndex + i]);
-//		}
-//		printf("\n");
-//	}
-
 	/// Starting ray from camera
 	// Create per ray data
 	PerRayData rayData;
@@ -123,11 +100,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 	packPointer(&rayData, payload0, payload1);
 
 	// Create base screen ray
-//	auto screen = make_float2(
-//		(static_cast<float>(screenX) + 0.5f) /
-//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-//		(static_cast<float>(screenY) + 0.5f) /
-//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
 	auto screen = make_float2(optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
 	                          optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1]);
 	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
@@ -218,10 +190,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 			}
 		}
 	}
-//
-//	if (firstRaySuccessful) {
-//		printf("First ray successful\n");
-//	}
 
 	// Make proposal ray
 	const float2 proposedScreenXY = make_float2(mutatedMutationNumber(mutationNumberIndex, 0),
@@ -232,14 +200,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y - 1) * proposedScreenXY.y);
 	const auto proposedPixelIndex = proposedScreenX + proposedScreenY * optixLaunchParameters.frame.frameBufferSize.x;
 
-//	printf("%f, %f\n", optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
-//	       mutatedMutationNumber(mutationNumberIndex, 0));
-
-//	screen = make_float2(
-//		(static_cast<float>(proposedScreenX) + 0.5f) /
-//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-//		(static_cast<float>(proposedScreenY) + 0.5f) /
-//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
 	screenMinus = make_float2(proposedScreenXY.x - 0.5f, proposedScreenXY.y - 0.5f);
 	horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
 	                                         screenMinus.x * camera.horizontal.y,
@@ -331,15 +291,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 						                                         1] = mutatedMutationNumber(
 							mutationNumberIndex + 2, i * 2 + 1);
 					}
-//						if (mutationNumberIndex == 585) {
-//							if (mutationNumberIndex == 585) {
-//								printf("Copy: ");
-//								for (int i = 0; i < optixLaunchParameters.traceDepth + 2; ++i) {
-//									printf("%f, ", optixLaunchParameters.curMutationNumbers[mutationNumberIndex + i]);
-//								}
-//								printf("\n");
-//							}
-//						}
 					break;
 				}
 			}
@@ -351,11 +302,6 @@ extern "C" __global__ void __raygen__renderFrame() {
 		const float baseColorValueSum =
 			(secondBaseColor.r + secondBaseColor.g + secondBaseColor.b) / rayData.energy *
 			static_cast<float>(optixLaunchParameters.samples.total);
-
-//			if (pixelIndex == proposedPixelIndex) {
-//				printf("Mutated Same\n");
-//			}
-//			printf("%u vs %u\n", pixelIndex, proposedPixelIndex);
 
 		atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].r,
 		          secondBaseColor.r / baseColorValueSum);
@@ -434,7 +380,6 @@ extern "C" __global__ void __closesthit__radiance() {
 		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1],
 		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2]),
 		                      normalAxis));
-//	const float3 yAxis = normalizeVectorGPU(vectorCrossProductGPU(optixLaunchParameters.camera.direction, normalAxis));
 
 	// Third Axis
 	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));
@@ -443,5 +388,3 @@ extern "C" __global__ void __closesthit__radiance() {
 	perRayData = {hitLocation, normalAxis, xAxis, yAxis, sbtData.color, sbtData.energy, sbtData.kind == Light};
 }
 extern "C" __global__ void __anyhit__radiance() {}
-
-#pragma clang diagnostic pop
