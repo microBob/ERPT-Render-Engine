@@ -227,9 +227,9 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const float2 proposedScreenXY = make_float2(mutatedMutationNumber(mutationNumberIndex, 0),
 	                                            mutatedMutationNumber(mutationNumberIndex, 1));
 	const auto proposedScreenX = llrintf(
-		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) * proposedScreenXY.x);
+		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1) * proposedScreenXY.x);
 	const auto proposedScreenY = llrintf(
-		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * proposedScreenXY.y);
+		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y - 1) * proposedScreenXY.y);
 	const auto proposedPixelIndex = proposedScreenX + proposedScreenY * optixLaunchParameters.frame.frameBufferSize.x;
 
 //	printf("%f, %f\n", optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
