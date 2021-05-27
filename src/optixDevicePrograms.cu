@@ -59,7 +59,17 @@ __device__ float mutatedMutationNumber(unsigned int mutationNumberIndex, unsigne
 		jumpSize = 0.005f;
 	}
 
-	float randomNumber = 1.0f - 2.0f * optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift];
+	float newMutationNumberToUse;
+	if (optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift] ==
+	    optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift]) {
+		if (indexShift == optixLaunchParameters.traceDepth * 2) {
+			newMutationNumberToUse = optixLaunchParameters.newMutationNumbers[mutationNumberIndex];
+		} else {
+			newMutationNumberToUse = optixLaunchParameters.newMutationNumbers[mutationNumberIndex + indexShift + 1];
+		}
+	}
+
+	float randomNumber = 1.0f - 2.0f * newMutationNumberToUse;
 	float randomJump = jumpSize * randomNumber;
 
 	float mutatedNumber = optixLaunchParameters.curMutationNumbers[mutationNumberIndex + indexShift] + randomJump;
@@ -218,6 +228,11 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const auto proposedScreenY = llrintf(
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * proposedScreenXY.y);
 	const auto proposedPixelIndex = proposedScreenX + proposedScreenY * optixLaunchParameters.frame.frameBufferSize.x;
+
+	if (proposedScreenXY.x == 0.5f) {
+		printf("%f, %f, %f\n", optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
+		       optixLaunchParameters.newMutationNumbers[mutationNumberIndex], proposedScreenXY.x);
+	}
 
 //	printf("%f, %f\n", optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
 //	       mutatedMutationNumber(mutationNumberIndex, 0));

@@ -271,9 +271,10 @@ void Raytracing::optixRender(unsigned long numSamples, unsigned int traceDepth, 
 
 	optixLaunchParameters.traceDepth = traceDepth;
 
+	cout << endl << "Rendering..." << endl << "|";
 	for (unsigned long i = 1; i <= numSamples; ++i) {
 		// update and (re)upload optix launch parameters
-		generateMutationNumbers(i * (seed + 256231800), traceDepth);
+		generateMutationNumbers(i * (seed + 1), traceDepth);
 		optixLaunchParameters.samples.index = i;
 		optixLaunchParametersBuffer.upload(&optixLaunchParameters, 1);
 
@@ -291,7 +292,12 @@ void Raytracing::optixRender(unsigned long numSamples, unsigned int traceDepth, 
 			fprintf(stderr, "error (%s: line %d): %s\n", __FILE__, __LINE__, cudaGetErrorString(error));
 			exit(2);
 		}
+
+		if (i % (numSamples / 10) == 0) {
+			cout << "*";
+		}
 	}
+	cout << "|" << endl;
 
 	auto renderEndTime = high_resolution_clock::now();
 
@@ -300,7 +306,7 @@ void Raytracing::optixRender(unsigned long numSamples, unsigned int traceDepth, 
 
 	cout << endl << "Total render time: " << totalRenderTime << " sec." << endl;
 	cout << "Average frame time: " << static_cast<float>(totalRenderTime * 1000) / static_cast<float>(numSamples)
-	     << " ms" << endl << endl;
+	     << " ms" << endl;
 }
 
 void Raytracing::downloadRender(float *pixData) {

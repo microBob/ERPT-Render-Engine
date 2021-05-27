@@ -103,7 +103,7 @@ extern "C" int main() {
 	}
 
 	//// SECTION: OptiX render
-	raytracing.optixRender(100, 2);
+	raytracing.optixRender(128, 4);
 	raytracing.downloadRender(pixData);
 
 
