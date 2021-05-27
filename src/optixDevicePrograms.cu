@@ -123,11 +123,13 @@ extern "C" __global__ void __raygen__renderFrame() {
 	packPointer(&rayData, payload0, payload1);
 
 	// Create base screen ray
-	auto screen = make_float2(
-		(static_cast<float>(screenX) + 0.5f) /
-		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-		(static_cast<float>(screenY) + 0.5f) /
-		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+//	auto screen = make_float2(
+//		(static_cast<float>(screenX) + 0.5f) /
+//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
+//		(static_cast<float>(screenY) + 0.5f) /
+//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+	auto screen = make_float2(optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
+	                          optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1]);
 	auto screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
 	auto horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
 	                                              screenMinus.x * camera.horizontal.y,
@@ -229,20 +231,15 @@ extern "C" __global__ void __raygen__renderFrame() {
 		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) * proposedScreenXY.y);
 	const auto proposedPixelIndex = proposedScreenX + proposedScreenY * optixLaunchParameters.frame.frameBufferSize.x;
 
-	if (proposedScreenXY.x == 0.5f) {
-		printf("%f, %f, %f\n", optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
-		       optixLaunchParameters.newMutationNumbers[mutationNumberIndex], proposedScreenXY.x);
-	}
-
 //	printf("%f, %f\n", optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
 //	       mutatedMutationNumber(mutationNumberIndex, 0));
 
-	screen = make_float2(
-		(static_cast<float>(proposedScreenX) + 0.5f) /
-		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
-		(static_cast<float>(proposedScreenY) + 0.5f) /
-		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
-	screenMinus = make_float2(screen.x - 0.5f, screen.y - 0.5f);
+//	screen = make_float2(
+//		(static_cast<float>(proposedScreenX) + 0.5f) /
+//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x),
+//		(static_cast<float>(proposedScreenY) + 0.5f) /
+//		static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y));
+	screenMinus = make_float2(proposedScreenXY.x - 0.5f, proposedScreenXY.y - 0.5f);
 	horizontalTimesScreenMinus = make_float3(screenMinus.x * camera.horizontal.x,
 	                                         screenMinus.x * camera.horizontal.y,
 	                                         screenMinus.x * camera.horizontal.z);
