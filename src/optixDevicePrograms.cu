@@ -56,18 +56,11 @@ extern "C" __global__ void __raygen__renderFrame() {
 	const unsigned int ix = optixGetLaunchIndex().x;
 	const unsigned int iy = optixGetLaunchIndex().y;
 	const unsigned int mutationNumberIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
-	unsigned int screenX = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x) *
+	unsigned int screenX = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.x - 1) *
 	                               optixLaunchParameters.curMutationNumbers[mutationNumberIndex]);
-	unsigned int screenY = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y) *
+	unsigned int screenY = llrintf(static_cast<float>(optixLaunchParameters.frame.frameBufferSize.y - 1) *
 	                               optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1]);
 	unsigned int pixelIndex = screenX + screenY * optixLaunchParameters.frame.frameBufferSize.x;
-
-	// Force every pixel to be accounted for at least once
-	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		screenX = ix;
-		screenY = iy;
-		pixelIndex = mutationNumberIndex;
-	}
 
 	const auto &camera = optixLaunchParameters.camera;
 
@@ -97,6 +90,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 	float3 rayOrigin = camera.position;
 	float3 rayDirectionNormalized = normalizeVectorGPU(rawRayDirection);
+	atomicAdd(&optixLaunchParameters.pixelVisits[pixelIndex], 1);
 
 	// Trace
 	optixTrace(optixLaunchParameters.optixTraversableHandle,
@@ -114,25 +108,24 @@ extern "C" __global__ void __raygen__renderFrame() {
 	           payload1);
 
 	colorVector baseColor;
+	bool raySuccessful;
 	if (rayData.normal.x + rayData.normal.y + rayData.normal.z != 0) {
-		baseColor = rayData.color; // Set base color
+		baseColor = rayData.color;
+		int depthIndex;
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
-			optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
+			raySuccessful = true;
 		} else { // Else, continue with second ray
 			/// Reflected ray
-			for (int depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
+			for (depthIndex = 0; depthIndex < optixLaunchParameters.traceDepth; ++depthIndex) {
 				// Create ray
-				const auto newRay = make_float3(
-					cospif(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2]),
-					cospif(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2 + 1]),
-					fabsf(cospif(
-						optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 4])));
-				const float r = sqrt(optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2]);
-				const float phi = 2 * 3.1415f * optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 3];
-				const float circleX = r * cos(phi);
-				const float circleY = r * sin(phi);
+				const float r = sqrt(
+					optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2 + depthIndex * 2]);
+				const float phi =
+					2 * optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 3 + depthIndex * 2];
+				const float circleX = r * cospif(phi);
+				const float circleY = r * sinpif(phi);
 				const float circleZ = sqrt(1 - (r * r));
 				const float3 newDirection = make_float3(
 					rayData.xAxis.x * circleX + rayData.yAxis.x * circleY + rayData.normal.x * circleZ,
@@ -164,26 +157,29 @@ extern "C" __global__ void __raygen__renderFrame() {
 				}
 				// If there's light, increment data
 				if (rayData.light) {
-					optixLaunchParameters.energyPerPixel[pixelIndex] += rayData.energy;
+					raySuccessful = true;
+					atomicAdd(&optixLaunchParameters.energyPerPixel[pixelIndex], rayData.energy);
 					break;
 				}
 			}
 		}
-	}
 
-	// Average out brightness
-	if (optixLaunchParameters.samples.index == optixLaunchParameters.samples.total) {
-		const float intensity = static_cast<float>(optixLaunchParameters.energyPerPixel[pixelIndex]) /
-		                        static_cast<float>(optixLaunchParameters.samples.total);
-		colorVector pixelColor = {intensity * baseColor.r, intensity * baseColor.g, intensity * baseColor.b};
-
-		optixLaunchParameters.frame.frameColorBuffer[pixelIndex] = pixelColor;
+		if (raySuccessful) {
+			const float colorSum =
+				(baseColor.r + baseColor.g + baseColor.b) / rayData.energy *
+				static_cast<float>(optixLaunchParameters.samples.total) * (depthIndex + 1) * (depthIndex + 1);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r, baseColor.r / colorSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g, baseColor.g / colorSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b, baseColor.b / colorSum);
+		}
 	}
 }
 
 /// Miss program
 extern "C" __global__ void __miss__radiance() {
-	// Empty for now
+	PerRayData &perRayData = *(PerRayData *) getPerRayData<PerRayData>();
+	const auto zeroVector = make_float3(0, 0, 0);
+	perRayData = {zeroVector, zeroVector, zeroVector, zeroVector, {}, 0, false};
 }
 
 /// Hit program
@@ -213,11 +209,19 @@ extern "C" __global__ void __closesthit__radiance() {
 	const auto vertexBMinusA = make_float3(vertexB.x - vertexA.x, vertexB.y - vertexA.y, vertexB.z - vertexA.z);
 	const auto vertexCMinusA = make_float3(vertexC.x - vertexA.x, vertexC.y - vertexA.y, vertexC.z - vertexA.z);
 	const float3 normalAxis = normalizeVectorGPU(vectorCrossProductGPU(vertexBMinusA, vertexCMinusA));
-	float normalDotDir = normalAxis.x * rayDir.x + normalAxis.y * rayDir.y + normalAxis.z * rayDir.z;
+	const colorVector normalColor = {(normalAxis.x + 1) / 2, (normalAxis.y + 1) / 2, (normalAxis.z + 1) / 2};
 
 	// Second Axis
+	// TODO: causing bad indirect lighting
+	const unsigned int ix = optixGetLaunchIndex().x;
+	const unsigned int iy = optixGetLaunchIndex().y;
+	const unsigned int mutationNumberIndex = ix + iy * optixLaunchParameters.frame.frameBufferSize.x;
 	const float3 yAxis = normalizeVectorGPU(
-		vectorCrossProductGPU(optixLaunchParameters.camera.direction, normalAxis));
+		vectorCrossProductGPU(make_float3(optixLaunchParameters.curMutationNumbers[mutationNumberIndex],
+		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 1],
+		                                  optixLaunchParameters.curMutationNumbers[mutationNumberIndex + 2]),
+		                      normalAxis));
+//	const float3 yAxis = normalizeVectorGPU(vectorCrossProductGPU(optixLaunchParameters.camera.direction, normalAxis));
 
 	// Third Axis
 	const float3 xAxis = normalizeVectorGPU(vectorCrossProductGPU(normalAxis, yAxis));
