@@ -80,7 +80,7 @@ Document Communication::ReceiveData() const {
 }
 
 void Communication::ConvertAndSend(float *pixData, size_t pixDataSize) const {
-	cout << "\n\nBegin Conversion" << endl;
+	cout << endl << "Begin Conversion" << endl;
 	auto beforeConvert = high_resolution_clock::now();
 
 	StringBuffer json;

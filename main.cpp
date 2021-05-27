@@ -69,8 +69,19 @@ extern "C" int main() {
 		// Kind
 		curMeshEncode.meshKind = static_cast<MeshKind>(curMesh.FindMember(KIND)->value.GetInt());
 		// Color
+		static colorVector color = {.5f, .3f, .8f};
 		if (curMeshEncode.meshKind == Mesh) {
-			curMeshEncode.color = {0.2f, 0.8f, 0.2f};
+			curMeshEncode.color = color; //{0.2f, 0.8f, 0.2f};
+			color = {color.r + .2f, color.g + .3f, color.b + .5f};
+			if (color.r > 1) {
+				color.r -= 1;
+			}
+			if (color.g > 1) {
+				color.g -= 1;
+			}
+			if (color.b > 1) {
+				color.b -= 1;
+			}
 		} else {
 			curMeshEncode.energy = 3;
 		}

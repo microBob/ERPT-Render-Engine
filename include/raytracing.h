@@ -68,7 +68,7 @@ protected:
 	// OptiX parameters
 	void createDataBuffers(unsigned long numSamples);
 
-	void generateMutationNumbers(unsigned long long int seed, unsigned int traceDepth, bool forCur = 0);
+	void generateMutationNumbers(unsigned long long int seed, unsigned int traceDepth, bool forCur = false);
 
 private:
 	static float3 normalizedVector(float3 vector);
@@ -120,7 +120,6 @@ protected:
 	CUDABuffer accelerationStructureBuffer; // Compressed triangleMeshes definition
 
 	CUDABuffer energyPerPixelBuffer;
-	CUDABuffer pixelVisitsBuffer;
 };
 
 //// SECTION: Shader binding table structs
