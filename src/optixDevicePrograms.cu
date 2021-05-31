@@ -141,6 +141,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 
 		// Increment Energy at pixel if a light source was hit
 		if (rayData.light) {
+			baseColor = {1, 1, 1};
 			firstRaySuccessful = true;
 		} else { // Else, continue with second ray
 			/// Reflected ray
@@ -237,6 +238,7 @@ extern "C" __global__ void __raygen__renderFrame() {
 		secondBaseColor = rayData.color; // Set base color
 
 		if (rayData.light) {
+			secondBaseColor = {1, 1, 1};
 			proposedRaySuccessful = true;
 		} else { // Else, continue with bounce
 			/// Reflected ray
@@ -303,19 +305,25 @@ extern "C" __global__ void __raygen__renderFrame() {
 			(secondBaseColor.r + secondBaseColor.g + secondBaseColor.b) / rayData.energy *
 			static_cast<float>(optixLaunchParameters.samples.total);
 
-		atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].r,
-		          secondBaseColor.r / baseColorValueSum);
-		atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].g,
-		          secondBaseColor.g / baseColorValueSum);
-		atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].b,
-		          secondBaseColor.b / baseColorValueSum);
+		if (baseColorValueSum != 0) {
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].r,
+			          secondBaseColor.r / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].g,
+			          secondBaseColor.g / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[proposedPixelIndex].b,
+			          secondBaseColor.b / baseColorValueSum);
+		}
+
 	} else if (firstRaySuccessful) {
 		const float baseColorValueSum =
 			(baseColor.r + baseColor.g + baseColor.b) / rayData.energy *
 			static_cast<float>(optixLaunchParameters.samples.total);
-		atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r, baseColor.r / baseColorValueSum);
-		atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g, baseColor.g / baseColorValueSum);
-		atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b, baseColor.b / baseColorValueSum);
+
+		if (baseColorValueSum != 0) {
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].r, baseColor.r / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].g, baseColor.g / baseColorValueSum);
+			atomicAdd(&optixLaunchParameters.frame.frameColorBuffer[pixelIndex].b, baseColor.b / baseColorValueSum);
+		}
 	} else {
 		// Get new values for base
 		for (int i = 0; i < optixLaunchParameters.traceDepth + 2; ++i) {
